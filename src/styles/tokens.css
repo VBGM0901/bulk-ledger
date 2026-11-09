@@ -1,0 +1,20 @@
+/* molu 디자인 토큰 (valuebridge-design/molu app/globals.css · app/appearance.css에서 추출) */
+:root{
+  color-scheme:light;
+  --molu-bg:#ffffff;--molu-side:#112449;--molu-card:#f6f9fe;--molu-soft:#e6e9f3;
+  --molu-ink:#0d1b3d;--molu-muted:#60708c;--molu-line:#dbe4f2;--molu-accent:#145dd9;--molu-selected:#e9f1ff;
+  --molu-error:#bd255d;--molu-warning:#a25a0b;--molu-ok:#17694e;--molu-on-accent:#ffffff;--molu-focus:#3674c5;
+  --hero:linear-gradient(108deg,#08172f 0%,#123c77 54%,#87b9dd 88%,#cfe6f7 100%);
+}
+:root[data-molu-theme="dark"]{
+  color-scheme:dark;
+  --molu-bg:#0a1427;--molu-side:#101e38;--molu-card:#15233e;--molu-soft:#1a2e4e;
+  --molu-ink:#eef5ff;--molu-muted:#bac9e0;--molu-line:#3d5578;--molu-accent:#aee9ff;--molu-selected:#2b456b;
+  --molu-error:#ffa39f;--molu-warning:#ffca87;--molu-ok:#8fe3c0;--molu-on-accent:#0a1427;--molu-focus:#aee9ff;
+  --hero:linear-gradient(108deg,#08172f 0%,#101e38 55%,#1a2e4e 100%);
+}
+html{background:var(--molu-bg)}
+body{margin:0;background:var(--molu-bg);color:var(--molu-ink);font-family:"Apple SD Gothic Neo",Paperlogy,"Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}

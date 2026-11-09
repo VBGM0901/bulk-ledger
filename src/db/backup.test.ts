@@ -1,0 +1,54 @@
+import { AppDB } from './db';
+import { ensureDefaults, exportBackup, importBackup, validateBackup } from './backup';
+
+let db: AppDB;
+beforeEach(async () => {
+  db = new AppDB('t-' + Math.random());
+  await ensureDefaults(db);
+});
+
+test('ensureDefaults seeds settings and 8 foods once', async () => {
+  await ensureDefaults(db);
+  expect(await db.foods.count()).toBe(8);
+  expect((await db.settings.get('settings'))!.kcalTarget).toBe(2800);
+});
+
+test('export → import round trip, API key never exported', async () => {
+  await db.incomes.put({ id: 'i', name: '월급', amount: 3_000_000 });
+  await db.settings.update('settings', { apiKey: 'sk-ant-secret' });
+  const file = await exportBackup(db);
+  expect(JSON.stringify(file)).not.toContain('sk-ant-secret');
+  const db2 = new AppDB('t2-' + Math.random());
+  await importBackup(db2, JSON.parse(JSON.stringify(file)), 'replace');
+  expect(await db2.incomes.get('i')).toEqual({ id: 'i', name: '월급', amount: 3_000_000 });
+  expect((await db.settings.get('settings'))!.lastBackupAt).not.toBeNull();
+});
+
+test('importing keeps the existing API key when file has none', async () => {
+  await db.settings.update('settings', { apiKey: 'sk-ant-keep' });
+  await importBackup(db, { app: 'bulk-ledger', version: 1, data: { settings: [{ id: 'settings', kcalTarget: 3000 }] } }, 'merge');
+  const s = (await db.settings.get('settings'))!;
+  expect(s.apiKey).toBe('sk-ant-keep');
+  expect(s.kcalTarget).toBe(3000);
+  expect(s.payday).toBe(10);
+});
+
+test.each([
+  ['not an object', 'hello'],
+  ['wrong app', { app: 'x', version: 1, data: {} }],
+  ['future version', { app: 'bulk-ledger', version: 2, data: {} }],
+  ['table not array', { app: 'bulk-ledger', version: 1, data: { incomes: 'oops' } }],
+  ['unknown table', { app: 'bulk-ledger', version: 1, data: { hacks: [] } }],
+  ['row not object', { app: 'bulk-ledger', version: 1, data: { incomes: [1] } }],
+])('invalid backup (%s) throws and leaves data untouched', async (_n, bad) => {
+  await db.incomes.put({ id: 'keep', name: '월급', amount: 1 });
+  expect(() => validateBackup(bad)).toThrow();
+  await expect(importBackup(db, bad, 'replace')).rejects.toThrow();
+  expect(await db.incomes.get('keep')).toBeTruthy();
+});
+
+test('merge mode keeps existing rows and adds new ones', async () => {
+  await db.incomes.put({ id: 'a', name: 'A', amount: 1 });
+  await importBackup(db, { app: 'bulk-ledger', version: 1, data: { incomes: [{ id: 'b', name: 'B', amount: 2 }] } }, 'merge');
+  expect(await db.incomes.count()).toBe(2);
+});
