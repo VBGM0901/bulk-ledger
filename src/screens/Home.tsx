@@ -34,7 +34,7 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
     <>
       <section className="hero">
         <div className="label">{md(period.start)} ~ {md(period.end)} 남은 예산</div>
-        <div className="big num">{formatKRW(s.remaining)}</div>
+        <div className="big num">{data.needsSetup ? '입력 필요' : formatKRW(s.remaining)}</div>
         <div className="label">
           하루 사용 가능 <span className="num">{formatKRW(s.dailyAllowance)}</span> · {s.daysLeft}일 남음
         </div>
