@@ -55,3 +55,12 @@ test('buying more food than planned lowers the remaining budget', () => {
   const base = summarizeBudget({ incomes, recurring, foodPlan: 100_000, expenses: [], period, today: '2026-11-10' });
   expect(base.remaining - s.remaining).toBe(30_000);
 });
+
+import { balanceNow } from './budget';
+test('balance: entered amount minus spending after that day; ignored from a past budget month', () => {
+  const ex = (date: string, amount: number) => ({ id: date + amount, date, amount, category: '추가식품' as const, memo: '', source: 'manual' as const });
+  const b = balanceNow({ amount: 500_000, date: '2026-11-12' }, [ex('2026-11-12', 9999), ex('2026-11-13', 20_000)], period, '2026-11-14')!;
+  expect(b.now).toBe(480_000); // 입력한 날 지출은 이미 반영된 걸로 봄
+  expect(b.daily).toBe(Math.floor(480_000 / 26)); // 11/14~12/9 = 26일
+  expect(balanceNow({ amount: 1, date: '2026-11-01' }, [], period, '2026-11-14')).toBeNull();
+});

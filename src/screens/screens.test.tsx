@@ -385,6 +385,7 @@ describe('홈 바로 입력', () => {
   test('salary: typing on home updates the first income (or creates 월급)', async () => {
     render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
     const f = screen.getByLabelText('월급');
+    fireEvent.focus(f);
     fireEvent.change(f, { target: { value: '2,100,000' } });
     fireEvent.blur(f);
     await waitFor(async () => expect((await db.incomes.toArray())[0]).toMatchObject({ name: '월급', amount: 2_100_000 }));
@@ -431,5 +432,22 @@ describe('고치기 · 자주 쓰는 것', () => {
     const id = (await db.intakes.get(TODAY))!.extras![0].id;
     await updateExtra(db, TODAY, id, { kcal: 550 });
     expect((await db.intakes.get(TODAY))!.extras![0].kcal).toBe(550);
+  });
+});
+
+describe('지금 남은 돈', () => {
+  test('typing saves by itself (no need to leave the field) and the top number switches to it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<Home data={deriveAppData(rawFixture(SAMPLE_BUDGET), TODAY)} navigate={() => {}} />);
+    const f = screen.getByLabelText('지금 남은 돈');
+    fireEvent.focus(f);
+    fireEvent.change(f, { target: { value: '450,000' } });
+    vi.advanceTimersByTime(900);
+    vi.useRealTimers();
+    await waitFor(async () => expect((await db.settings.get('settings'))!.balance).toEqual({ amount: 450_000, date: TODAY }));
+    const d = deriveAppData(rawFixture({ ...SAMPLE_BUDGET, settings: { ...DEFAULT_SETTINGS, balance: { amount: 450_000, date: TODAY } } }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    expect(screen.getByText('450,000원')).toBeInTheDocument();
+    expect(screen.getByText(/지금 남은 돈 · 11\/10 입력/)).toBeInTheDocument();
   });
 });

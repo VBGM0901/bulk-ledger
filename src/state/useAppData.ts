@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { ensureDefaults } from '../db/backup';
 import { db } from '../db/db';
-import { summarizeBudget } from '../domain/budget';
+import { balanceNow, summarizeBudget } from '../domain/budget';
 import { estimateStock, measuredDailyUse } from '../domain/consumption';
 import { budgetPeriod, daysBetween, todayISO } from '../domain/dates';
 import { dailyQtyByFood, planFoodPurchases } from '../domain/foodPlan';
@@ -55,12 +55,13 @@ export function deriveAppData(raw: RawData, today: ISODate) {
     .sort()[0];
   const since = last ?? firstRecord ?? null;
   const backupStale = since !== null && daysBetween(since, today) > 7;
+  const balance = balanceNow(settings.balance, raw.expenses, period, today);
   const todayIntake = dayIntake(today, foods, settings, raw.dinners, raw.intakes);
   const recentIntake = recentIntakePct(today, 7, foods, settings, raw.dinners, raw.intakes);
   const advice = bulkAdvice(raw.weights, settings.weightGoal, today, recentIntake?.pct ?? null);
   const needsSetup = raw.incomes.length === 0 && raw.recurring.length === 0;
   return {
-    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup, todayIntake, recentIntake, advice,
+    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup, balance, todayIntake, recentIntake, advice,
   };
 }
 export type AppData = ReturnType<typeof deriveAppData>;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Screen } from '../App';
 import { Bar, Card, Notice, Stat } from '../components/ui';
 import { depletionDate } from '../domain/consumption';
@@ -7,7 +7,7 @@ import { formatKRW, formatNum, parseAmount } from '../domain/money';
 import { shortName } from '../domain/display';
 import { weeklyReview } from '../domain/checkin';
 import { dayIntake } from '../domain/intake';
-import { logWeight, weeklyCheckin } from '../db/actions';
+import { logWeight, updateSettings, weeklyCheckin } from '../db/actions';
 import { db } from '../db/db';
 import { forecastDate, goalWeightOn, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
@@ -25,16 +25,27 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
     .filter((f) => tracked.has(f.id))
     .map((f) => ({ f, date: depletionDate(data.stock[f.id] ?? 0, data.dailyUse[f.id], data.today) }))
     .filter((x): x is { f: typeof x.f; date: string } => x.date !== null && x.date <= soonLimit);
-  const pct = (v: number) => (s.income > 0 ? `${Math.round((v / s.income) * 100)}%` : undefined);
 
   return (
     <>
       <section className="hero">
-        <div className="label">{md(period.start)} ~ {md(period.end)} 남은 예산</div>
-        <div className="big num">{data.needsSetup ? '입력 필요' : formatKRW(s.remaining)}</div>
-        <div className="label">
-          하루 사용 가능 <span className="num">{formatKRW(s.dailyAllowance)}</span> · {s.daysLeft}일 남음
-        </div>
+        {data.balance ? (
+          <>
+            <div className="label">지금 남은 돈 · {md(data.balance.since)} 입력{data.balance.spentSince ? ` 후 ${formatKRW(data.balance.spentSince)} 씀` : ''}</div>
+            <div className="big num">{formatKRW(data.balance.now)}</div>
+            <div className="label">
+              하루 사용 가능 <span className="num">{formatKRW(data.balance.daily)}</span> · {s.daysLeft}일 남음 · 계획상 {formatKRW(s.remaining)}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="label">{md(period.start)} ~ {md(period.end)} 고정비·식비 빼고 쓸 수 있는 돈</div>
+            <div className="big num">{data.needsSetup ? '입력 필요' : formatKRW(s.remaining)}</div>
+            <div className="label">
+              하루 사용 가능 <span className="num">{formatKRW(s.dailyAllowance)}</span> · {s.daysLeft}일 남음
+            </div>
+          </>
+        )}
       </section>
 
       {data.needsSetup && (
@@ -83,8 +94,9 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
 
       <Card title="이번 예산월 돈">
         <SalaryField data={data} />
-        <Stat label="고정·정기" value={formatKRW(s.fixed)} sub={pct(s.fixed)} />
-        <Stat label="식단 계획" value={formatKRW(s.foodPlan)} sub={`${pct(s.foodPlan) ?? ''} · 실제 구매 ${formatKRW(s.foodSpent)}`} />
+        <BalanceField data={data} />
+        <Stat label="고정·정기" value={formatKRW(s.fixed)} />
+        <Stat label={s.foodSpent > s.foodPlan ? '식단 (계획보다 더 삼)' : '식단 계획'} value={formatKRW(Math.max(s.foodPlan, s.foodSpent))} />
         <Stat label="식단 외 지출" value={formatKRW(s.otherSpent)} />
         <Bar value={s.fixed + Math.max(s.foodPlan, s.foodSpent) + s.otherSpent} max={Math.max(1, s.income)} label="수입 대비 지출" />
       </Card>
@@ -218,6 +230,50 @@ function QuickWeight({ data }: { data: AppData }) {
   );
 }
 
+/**
+ * 금액 입력칸: 쓰는 동안 0.8초 멈추면 자동 저장, 칸에서 나와도 저장 (아이폰 숫자 키패드엔 완료 키가 없어서).
+ * 입력 중엔 바깥 값으로 덮어쓰지 않는다.
+ */
+function AmountInput({ label, value, placeholder, onSave }: {
+  label: string; value: number | null; placeholder: string; onSave: (v: number | null) => Promise<void>;
+}) {
+  const fmt = (v: number | null) => (v === null ? '' : v.toLocaleString('ko-KR'));
+  const [draft, setDraft] = useState(fmt(value));
+  const [focused, setFocused] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  const shown = focused ? draft : fmt(value);
+  async function commit(text: string) {
+    window.clearTimeout(timer.current);
+    const v = text.trim() === '' ? null : parseAmount(text);
+    if (text.trim() !== '' && (v === null || v < 0)) return;
+    if (v === value) return;
+    await onSave(v);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  }
+  return (
+    <span className="amount-input">
+      {saved && <small className="ok">저장됨</small>}
+      <input
+        className="input num salary-input"
+        inputMode="numeric"
+        aria-label={label}
+        value={shown}
+        placeholder={placeholder}
+        onFocus={() => { setDraft(fmt(value)); setFocused(true); }}
+        onChange={(e) => {
+          const t = e.target.value;
+          setDraft(t);
+          window.clearTimeout(timer.current);
+          timer.current = window.setTimeout(() => commit(t), 800);
+        }}
+        onBlur={(e) => { setFocused(false); commit(e.target.value); }}
+      />
+    </span>
+  );
+}
+
 /** 월급: 바로 입력 (설정의 첫 번째 수입과 같은 값) */
 function SalaryField({ data }: { data: AppData }) {
   const salary = data.incomes[0];
@@ -225,19 +281,31 @@ function SalaryField({ data }: { data: AppData }) {
   return (
     <div className="quick-weight">
       <span className="muted">월급{others ? ` (그 외 수입 ${formatKRW(others)})` : ''}</span>
-      <input
-        key={`${salary?.id}-${salary?.amount}`}
-        className="input num salary-input"
-        inputMode="numeric"
-        aria-label="월급"
-        defaultValue={salary?.amount ? salary.amount.toLocaleString('ko-KR') : ''}
+      <AmountInput
+        label="월급"
+        value={salary?.amount ?? null}
         placeholder="월급 입력"
-        onBlur={async (e) => {
-          const v = parseAmount(e.target.value);
-          if (v === null || v === salary?.amount) return;
+        onSave={async (v) => {
+          if (v === null) return;
           if (salary) await db.incomes.update(salary.id, { amount: v });
           else await db.incomes.put({ id: 'salary', name: '월급', amount: v });
         }}
+      />
+    </div>
+  );
+}
+
+/** 지금 남은 돈: 통장 잔액 등 실제 금액을 넣으면 홈 맨 위가 그 기준으로 바뀐다. 비우면 계획 기준으로 돌아감 */
+function BalanceField({ data }: { data: AppData }) {
+  const b = data.balance;
+  return (
+    <div className="quick-weight">
+      <span className="muted">지금 남은 돈{b ? ` (${md(b.since)} 기준)` : ''}</span>
+      <AmountInput
+        label="지금 남은 돈"
+        value={b ? data.settings.balance!.amount : null}
+        placeholder="잔액 입력"
+        onSave={(v) => updateSettings(db, { balance: v === null ? null : { amount: v, date: data.today } })}
       />
     </div>
   );

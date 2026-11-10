@@ -97,6 +97,8 @@ export interface Settings {
   profileNote: string;
   /** 기본 식단 변경을 몇 번째까지 적용했는지 (한 번만 적용하려고) */
   migratedV?: number;
+  /** 직접 넣은 '지금 남은 돈' (넣은 날짜와 함께) */
+  balance?: { amount: number; date: ISODate } | null;
   /** 주간 체크인 기록 (주 = 그 주 월요일) */
   checkins?: { week: ISODate; choice: 'apply' | 'keep' | 'ok'; delta: number; kcalAfter: number; at: string }[];
 }
