@@ -22,7 +22,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('Home', () => {
   test('remaining budget, daily allowance, nutrition, backup warning', () => {
-    render(<Home data={deriveAppData(rawFixture(SAMPLE_BUDGET), TODAY)} navigate={() => {}} />);
+    render(<Home data={deriveAppData(rawFixture({ ...SAMPLE_BUDGET, weights: [{ date: '2026-11-01', kg: 70 }] }), TODAY)} navigate={() => {}} />);
     expect(screen.getByText('1,216,380원')).toBeInTheDocument();
     expect(screen.getByText('40,546원')).toBeInTheDocument();
     expect(screen.getByText(/2,746 \/ 2,800 kcal/)).toBeInTheDocument();
