@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Bar, Card, Stat } from '../components/ui';
-import { deleteWeight, logWeight, markAllEaten } from '../db/actions';
+import { copyDayMeals, deleteWeight, logWeight, markAllEaten } from '../db/actions';
 import { db } from '../db/db';
 import { addDays } from '../domain/dates';
 import { dayIntake, type DayIntake } from '../domain/intake';
@@ -31,8 +31,18 @@ function monthDays(first: ISODate): ISODate[] {
 }
 
 export default function Log({ data }: { data: AppData }) {
-  const [month, setMonth] = useState(monthStart(data.today));
-  const [sel, setSel] = useState<ISODate>(data.today);
+  // null = '오늘'을 따라감 (앱을 켜 둔 채 날이 바뀌어도 새 오늘로)
+  const [monthPick, setMonthPick] = useState<ISODate | null>(null);
+  const [selPick, setSelPick] = useState<ISODate | null>(null);
+  const month = monthPick ?? monthStart(data.today);
+  const sel = selPick ?? data.today;
+  const setSel = (d: ISODate) => setSelPick(d === data.today ? null : d);
+  const setMonth = (m: ISODate) => {
+    const current = m === monthStart(data.today);
+    setMonthPick(current ? null : m);
+    // 달을 바꾸면 그 달의 마지막 날(이번 달이면 오늘)을 고른다
+    setSelPick(current ? null : addDays(shiftMonth(m, 1), -1));
+  };
   const days = monthDays(month);
   const intakeOf = (d: ISODate) => dayIntake(d, data.foods, data.settings, data.dinners, data.intakes);
   const weightOf = (d: ISODate) => data.weights.find((w) => w.date === d)?.kg ?? null;
@@ -104,6 +114,7 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
   const [kg, setKg] = useState(weight === null ? '' : String(weight));
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const log = data.intakes.find((l) => l.date === date);
   const choice: DinnerChoice = data.dinners.find((d) => d.date === date)?.choice ?? 'meat';
   const plan = dailyNutrition(data.foods, data.settings.meals, data.settings.dinner[choice]);
@@ -117,7 +128,10 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
       <section className="card day-head">
         <div className="row">
           <h2>{label}</h2>
-          <button className="btn primary" onClick={() => markAllEaten(db, date, names)}>전부 다 먹음</button>
+          <span className="row" style={{ gap: 6 }}>
+            <button className="btn" onClick={async () => setCopyMsg((await copyDayMeals(db, addDays(date, -1), date)) ? null : '전날 기록이 없어요.')}>어제처럼</button>
+            <button className="btn primary" onClick={() => markAllEaten(db, date, names)}>전부 다 먹음</button>
+          </span>
         </div>
         <div className="day-sum">
           <div>
@@ -130,7 +144,7 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
           <div>
             <span className="muted">단백질</span>
             <b className={`num ${intake ? (proteinOk ? 'ok' : 'warn') : ''}`}>{intake ? formatNum(intake.protein, 1) : '0'}g</b>
-            <small className="muted"> / {data.settings.proteinTarget[0]}g</small>
+            <small className="muted"> / {data.settings.proteinTarget.join('~')}g</small>
           </div>
           <div>
             <span className="muted">달성</span>
@@ -138,14 +152,14 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
           </div>
         </div>
         <Bar value={intake?.kcal ?? 0} max={data.settings.kcalTarget} label="그날 칼로리 목표 대비" />
-        <p className="muted" style={{ margin: 0 }}>먹은 음식을 눌러 체크하세요. 체크한 것만 계산돼요.</p>
+        <p className="muted" style={{ margin: 0 }}>{copyMsg ?? '먹은 음식을 눌러 체크하세요. 체크한 것만 계산돼요.'}</p>
       </section>
 
       {data.settings.meals.map((meal, i) => (
         <MealChecklist key={meal.name} data={data} date={date} meal={meal} index={i} log={log} choice={choice} />
       ))}
 
-      <ExtraFoods data={data} date={date} log={log} />
+      <ExtraFoods date={date} log={log} />
 
       <section className="card">
         <div className="row weight-row">

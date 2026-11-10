@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, Stat } from '../components/ui';
 import { addDays } from '../domain/dates';
 import { formatNum } from '../domain/money';
-import { goalWeightOn, movingAverage } from '../domain/weight';
+import { forecastDate, goalWeightOn, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
 const RANGES = [28, 56, 91] as const;
@@ -15,6 +15,7 @@ export function WeightTrend({ data }: { data: AppData }) {
   const avg = movingAverage(data.weights, data.today);
   const { advice } = data;
   const rate = advice.rate;
+  const forecast = forecastDate(data.weights, goal, data.today);
 
   const n = range;
   const days = Array.from({ length: n }, (_, i) => addDays(data.today, i - (n - 1)));
@@ -41,10 +42,19 @@ export function WeightTrend({ data }: { data: AppData }) {
           value={rate === null ? '데이터 부족' : `${rate >= 0 ? '+' : ''}${formatNum(rate, 2)}kg`}
           tone={tone}
         />
-        {advice.targetRate !== null && <Stat label="목표 속도" value={`주 +${formatNum(advice.targetRate, 2)}kg`} />}
+        {goal && (
+          <Stat
+            label={`${goal.targetKg}kg 도달 예상`}
+            value={forecast ? `${Number(forecast.slice(5, 7))}월 ${Number(forecast.slice(8))}일쯤` : '아직 계산 못 해요'}
+            sub={forecast ? `목표일 ${goal.endDate.slice(5).replace('-', '/')} · 지금 속도로 쭉 가면` : '체중이 늘기 시작하면 보여요'}
+            tone={forecast ? (forecast <= goal.endDate ? 'ok' : 'warn') : undefined}
+          />
+        )}
+        {advice.targetRate !== null && <Stat label="목표 속도" value={`주 ${advice.targetRate >= 0 ? '+' : ''}${formatNum(advice.targetRate, 2)}kg`} />}
         {data.recentIntake && (
           <Stat label="최근 7일 식사" value={`평균 ${Math.round(data.recentIntake.pct * 100)}%`} sub={`${data.recentIntake.logged}일 기록`} />
         )}
+        <p className="muted small-note">참고용 계산이에요. 몸 상태가 안 좋거나 급하게 변하면 전문가와 상담하세요.</p>
       </Card>
 
       <Card title="체중 추세">
@@ -55,7 +65,7 @@ export function WeightTrend({ data }: { data: AppData }) {
         </div>
         <Stat label="지금 (7일 평균)" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)}kg`} />
         {goal && (
-          <Stat label="오늘 목표선" value={`목표선 ${formatNum(goalWeightOn(goal, data.today), 1)}kg`} sub={`${goal.startKg}→${goal.targetKg}kg · ${goal.endDate}까지`} />
+          <Stat label="오늘 목표선" value={`${formatNum(goalWeightOn(goal, data.today), 1)}kg`} sub={`${goal.startKg}→${goal.targetKg}kg · ${goal.endDate}까지`} />
         )}
         {ys.length > 0 && (
           <svg viewBox="0 0 300 100" width="100%" height="140" role="img" aria-label={`최근 ${RANGE_LABEL[range]} 체중과 목표선`}>

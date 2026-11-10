@@ -14,6 +14,7 @@ export interface BackupFile {
 const AFTERNOON_V1 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }]);
 const AFTERNOON_V2 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }]);
 export function migrateSettings(s: Settings): Settings {
+  if ((s.migratedV ?? 0) >= 1) return s; // 이미 적용함 — 사용자가 다시 바꾼 값은 그대로 둔다
   const afternoon = DEFAULT_MEALS.find((m) => m.name === '오후 간식')!.items;
   const meals = s.meals.map((m) => {
     const cur = JSON.stringify(m.items);
@@ -22,14 +23,14 @@ export function migrateSettings(s: Settings): Settings {
   });
   const p = s.proteinTarget;
   const proteinTarget: [number, number] = p[0] === 110 && p[1] === 120 ? [90, 110] : p;
-  return { ...s, meals, proteinTarget };
+  return { ...s, meals, proteinTarget, migratedV: 1 };
 }
 
 export async function ensureDefaults(db: AppDB): Promise<void> {
   await db.transaction('rw', db.settings, db.foods, async () => {
     const s = await db.settings.get('settings');
     if (!s) await db.settings.put(DEFAULT_SETTINGS);
-    else await db.settings.put(migrateSettings({ ...DEFAULT_SETTINGS, ...s })); // 새 설정 항목이 생겨도 기본값으로 채움
+    else await db.settings.put(migrateSettings({ ...DEFAULT_SETTINGS, migratedV: 0, ...s })); // 새 설정 항목이 생겨도 기본값으로 채움
     if ((await db.foods.count()) === 0) await db.foods.bulkPut(DEFAULT_FOODS);
     // 식단에 우유가 들어갔는데 식품 목록에 없으면 추가
     const meals = (await db.settings.get('settings'))?.meals ?? [];
@@ -37,10 +38,14 @@ export async function ensureDefaults(db: AppDB): Promise<void> {
   });
 }
 
+/** 백업 파일을 실제로 저장(공유)한 뒤에만 부른다 */
+export async function markBackedUp(db: AppDB): Promise<void> {
+  await db.settings.update('settings', { lastBackupAt: new Date().toISOString() });
+}
+
 /** API 키는 백업에 넣지 않는다 (파일이 공유될 수 있으므로). */
 export async function exportBackup(db: AppDB): Promise<BackupFile> {
   const now = new Date().toISOString();
-  await db.settings.update('settings', { lastBackupAt: now });
   const data = {} as Record<TableName, unknown[]>;
   for (const t of TABLES) data[t] = await db.table(t).toArray();
   data.settings = (data.settings as { apiKey?: string }[]).map((s) => ({ ...s, apiKey: '' }));
@@ -72,7 +77,11 @@ export async function importBackup(db: AppDB, x: unknown, mode: 'replace' | 'mer
   await db.transaction('rw', tables, async () => {
     for (const t of TABLES) {
       let rows = file.data[t];
-      if (!rows) continue;
+      if (!rows) {
+        // 교체: 파일에 없는 표(예: 예전 백업에는 없던 식사 기록·대화)도 비운다. 설정·식품은 기본값을 남긴다
+        if (mode === 'replace' && t !== 'settings' && t !== 'foods') await db.table(t).clear();
+        continue;
+      }
       if (t === 'settings') {
         const existing = await db.settings.get('settings');
         rows = (rows as Record<string, unknown>[]).map((r) => ({

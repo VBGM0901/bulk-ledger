@@ -48,7 +48,7 @@ export function deriveAppData(raw: RawData, today: ISODate) {
     stock[f.id] = estimateStock(raw.stockEvents, f.id, dailyUse[f.id] ?? 0, today);
   }
   const shopping = planShopping({ foods, dailyUse, stock });
-  const last = settings.lastBackupAt?.slice(0, 10) ?? null;
+  const last = settings.lastBackupAt ? todayISO(new Date(settings.lastBackupAt)) : null; // 한국 날짜 기준
   // 백업한 적이 없으면, 앱에 처음 기록한 날부터 7일이 지나야 경고 (설치 직후엔 경고 안 함)
   const firstRecord = [...raw.weights, ...raw.expenses, ...raw.purchases, ...raw.dinners, ...raw.intakes]
     .map((r) => r.date)

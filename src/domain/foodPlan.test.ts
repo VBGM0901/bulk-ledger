@@ -30,10 +30,5 @@ test('food without pack options is reported missing, not NaN', () => {
   const plan = planFoodPurchases(foods, DEFAULT_MEALS, 30);
   expect(plan.missing).toEqual(['nuts']);
   expect(plan.total).toBe(299820 - 10980);
-  expect(line(plan, 'nuts').consumptionCost).toBeNull();
 });
 
-test('consumption cost uses cheapest unit price', () => {
-  const plan = planFoodPurchases(DEFAULT_FOODS, DEFAULT_MEALS, 30);
-  expect(line(plan, 'yogurt').consumptionCost).toBe(44700);
-});

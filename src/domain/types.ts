@@ -53,7 +53,9 @@ export type MealStatus = 'all' | 'half' | 'none';
 /** 대화방에서 Claude가 기록한 것 하나 + 되돌리기 정보 */
 export type UndoSpec =
   | { kind: 'expense'; expenseId: string }
-  | { kind: 'intake'; date: ISODate; prev: IntakeLog | null }
+  | { kind: 'intake'; date: ISODate; prev: IntakeLog | null } // 예전 기록용 (하루 전체 되돌림)
+  | { kind: 'meals'; date: ISODate; prev: Record<string, { status?: MealStatus; items?: Record<string, number> }> }
+  | { kind: 'extra'; date: ISODate; extraId: string }
   | { kind: 'weight'; date: ISODate; prev: number | null };
 export interface ChatAction { summary: string; undo: UndoSpec; undone?: boolean }
 /** Claude 대화방 메시지 (폰에만 저장). 사진은 저장하지 않고 hadImage만 남긴다. */
@@ -86,7 +88,6 @@ export interface Settings {
   kcalTarget: number;
   proteinTarget: [number, number];
   weightGoal: WeightGoal | null;
-  logScope: 'food' | 'all';
   apiKey: string;
   lastBackupAt: string | null;
   theme: 'light' | 'dark' | 'system';
@@ -94,4 +95,6 @@ export interface Settings {
   meals: Meal[];
   /** 키·나이·운동 등 Claude에게 알려줄 개인 메모 (폰에만 저장). */
   profileNote: string;
+  /** 기본 식단 변경을 몇 번째까지 적용했는지 (한 번만 적용하려고) */
+  migratedV?: number;
 }

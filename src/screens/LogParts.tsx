@@ -3,17 +3,13 @@ import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { addExtra, removeExtra, setDinner, setItemQty, setMealStatus } from '../db/actions';
 import { db } from '../db/db';
-import { mealColor, shortName } from '../domain/display';
+import { DINNER_OPTIONS, mealColor, shortName } from '../domain/display';
 import { HOME_KEY, initialItems } from '../domain/intake';
 import { formatNum } from '../domain/money';
 import type { DinnerChoice, IntakeLog, ISODate, Meal } from '../domain/types';
 import type { AppData } from '../state/useAppData';
 
-export const DINNER: { id: DinnerChoice; label: string }[] = [
-  { id: 'meat', label: '고기 있음' },
-  { id: 'none', label: '고기 없음' },
-  { id: 'less', label: '덜 먹음' },
-];
+const DINNER = DINNER_OPTIONS;
 const fmtQty = (q: number) => formatNum(q, q % 1 ? 1 : 0);
 
 /**
@@ -107,7 +103,7 @@ export function MealChecklist({ data, date, meal, index, log, choice }: {
 }
 
 /** 계획에 없던 음식 (편의점 간식, 외식 등). 평소엔 접혀 있다. */
-export function ExtraFoods({ date, log }: { data?: AppData; date: ISODate; log?: IntakeLog }) {
+export function ExtraFoods({ date, log }: { date: ISODate; log?: IntakeLog }) {
   const extras = log?.extras ?? [];
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');

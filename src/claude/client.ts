@@ -22,7 +22,8 @@ export type ContentBlock =
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string | ContentBlock[] }
 
-export const MODELS = { capture: 'claude-haiku-5-5', chat: 'claude-sonnet-5-5' } as const;
+/** ping: 키 연결 확인용(가장 싼 모델), chat: 대화방 */
+export const MODELS = { ping: 'claude-haiku-5-5', chat: 'claude-sonnet-5-5' } as const;
 
 export async function callClaude(opts: {
   apiKey: string;

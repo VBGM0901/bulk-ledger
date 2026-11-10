@@ -21,7 +21,7 @@ test('export → import round trip, API key never exported', async () => {
   const db2 = new AppDB('t2-' + Math.random());
   await importBackup(db2, JSON.parse(JSON.stringify(file)), 'replace');
   expect(await db2.incomes.get('i')).toEqual({ id: 'i', name: '월급', amount: 3_000_000 });
-  expect((await db.settings.get('settings'))!.lastBackupAt).not.toBeNull();
+  expect((await db.settings.get('settings'))!.lastBackupAt).toBeNull(); // 실제로 저장(공유)한 뒤에만 markBackedUp
 });
 
 test('importing keeps the existing API key when file has none', async () => {
@@ -56,17 +56,17 @@ test('merge mode keeps existing rows and adds new ones', async () => {
 import { migrateSettings } from './backup';
 import { DEFAULT_SETTINGS } from '../domain/defaults';
 test('old afternoon snack with juice is migrated once; a user-edited plan is left alone', () => {
-  const old = { ...DEFAULT_SETTINGS, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
+  const old = { ...DEFAULT_SETTINGS, migratedV: 0, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
     ? { ...m, items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }] } : m) };
   const fixed = migrateSettings(old).meals.find((m) => m.name === '오후 간식')!;
   expect(fixed.items.some((i) => i.foodId === 'juice')).toBe(false);
-  const custom = { ...DEFAULT_SETTINGS, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
+  const custom = { ...DEFAULT_SETTINGS, migratedV: 0, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
     ? { ...m, items: [{ foodId: 'juice', qty: 2 }] } : m) };
   expect(migrateSettings(custom).meals.find((m) => m.name === '오후 간식')!.items).toEqual([{ foodId: 'juice', qty: 2 }]);
 });
 
 test('saved plan without juice gets milk; protein target 110~120 becomes 90~110; milk food is added', async () => {
-  await db.settings.put({ ...DEFAULT_SETTINGS, proteinTarget: [110, 120], meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
+  await db.settings.put({ ...DEFAULT_SETTINGS, migratedV: undefined, proteinTarget: [110, 120], meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
     ? { ...m, items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }] } : m) });
   await db.foods.delete('milk');
   await ensureDefaults(db);
@@ -74,4 +74,10 @@ test('saved plan without juice gets milk; protein target 110~120 becomes 90~110;
   expect(s.meals.find((m) => m.name === '오후 간식')!.items.at(-1)).toEqual({ foodId: 'milk', qty: 200 });
   expect(s.proteinTarget).toEqual([90, 110]);
   expect(await db.foods.get('milk')).toBeTruthy();
+});
+
+test('migration runs only once: a protein target the user sets back to 110~120 stays', async () => {
+  await db.settings.put({ ...DEFAULT_SETTINGS, migratedV: 1, proteinTarget: [110, 120] });
+  await ensureDefaults(db);
+  expect((await db.settings.get('settings'))!.proteinTarget).toEqual([110, 120]);
 });

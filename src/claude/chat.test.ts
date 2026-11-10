@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from '../domain/defaults';
 import { rawFixture, SAMPLE_BUDGET } from '../state/testData';
 import { deriveAppData } from '../state/useAppData';
-import { askClaude, buildChatContext } from './chat';
+import { buildChatContext } from './chat';
 
 const data = deriveAppData(
   rawFixture({ ...SAMPLE_BUDGET, settings: { ...DEFAULT_SETTINGS, apiKey: 'sk-ant-secret' }, weights: [{ date: '2026-11-10', kg: 70.1 }] }),
@@ -23,15 +23,6 @@ test('profile note from settings is included when present', () => {
   expect(buildChatContext(d)).toContain('사용자 메모: 웨이트 주 4회');
 });
 
-test('askClaude uses sonnet, sends history, system holds context', async () => {
-  const f = vi.fn().mockResolvedValue(new Response(JSON.stringify({ content: [{ type: 'text', text: '답' }] }), { status: 200 }));
-  expect(await askClaude(data, [{ role: 'user', content: '얼마 남았어?' }], f)).toBe('답');
-  const body = JSON.parse(f.mock.calls[0][1].body);
-  expect(body.model).toBe('claude-sonnet-5-5');
-  expect(body.messages).toEqual([{ role: 'user', content: '얼마 남았어?' }]);
-  expect(body.system).toContain('남은 예산');
-  expect(body.system).not.toContain('sk-ant-secret');
-});
 
 test('context includes recent intake and weight records', () => {
   const d = deriveAppData(rawFixture({

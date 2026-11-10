@@ -15,8 +15,6 @@
 .num{font-variant-numeric:tabular-nums;font-weight:700}
 .warn{color:var(--molu-warning)}.err{color:var(--molu-error)}.ok{color:var(--molu-ok)}
 .bar{height:8px;border-radius:99px;background:var(--molu-soft);overflow:hidden;margin:4px 0 8px}.bar>span{display:block;height:100%;background:var(--molu-accent);border-radius:99px}
-.btn:disabled{opacity:.55}
-.btn.block{width:100%;justify-content:flex-start;margin-bottom:8px}
 .seg{display:flex;gap:4px;padding:4px;border:1px solid var(--molu-line);border-radius:10px;background:var(--molu-bg)}
 .seg button{flex:1;min-height:40px;border:0;background:transparent;border-radius:7px;font-weight:700;color:var(--molu-muted);font-size:14px}
 .field{display:grid;gap:4px;margin:0 0 10px}.field>span{font-size:13px;font-weight:700}
@@ -46,8 +44,6 @@
 .cal-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-bottom:6px}
 .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .dot.g-good{background:var(--molu-ok)}.dot.g-ok{background:var(--molu-warning)}.dot.g-low{background:var(--molu-error)}
-.meal-check{padding:10px 0;border-top:1px solid var(--molu-line)}
-.meal-check .row{margin-bottom:6px}
 .seg.sub{margin-top:6px}.seg.sub button{min-height:34px;font-size:13px}
 .advice{font-size:17px;margin:2px 0 4px}
 
@@ -81,14 +77,6 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 /* 음식별 체크 */
 .link-btn{display:inline-flex;align-items:center;min-height:36px;margin-top:4px;padding:6px 2px;border:0;background:none;color:var(--btn-ink);font-size:13px;font-weight:700}
 @media(hover:hover) and (pointer:fine){.link-btn:hover{text-decoration:underline;text-underline-offset:3px}}
-.food-list{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:6px}
-.food-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--molu-line);border-radius:8px;background:var(--molu-bg)}
-.food-list li.skipped .food-name{opacity:.5;text-decoration:line-through}
-.food-name{display:grid;gap:2px;min-width:0;font-size:14px;font-weight:700;overflow-wrap:anywhere}
-.food-name small{font-weight:600}
-.stepper{display:flex;align-items:center;gap:6px;flex:none}
-.stepper .btn.icon{min-width:38px;min-height:38px;padding:0;font-size:18px}
-.stepper .num{min-width:46px;text-align:center}
 /* Claude 대화방 */
 .chat{display:flex;flex-direction:column;min-height:calc(100dvh - 160px)}
 .chat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -160,3 +148,26 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .key-setup{border-color:var(--btn-line);background:var(--btn-bg)}
 .key-setup h2{font-size:16px;margin:0 0 4px}
 .key-setup p{margin:0 0 8px}
+.hint-card{display:flex;align-items:center;gap:10px;text-align:left;border-color:var(--btn-line);background:var(--btn-bg);color:var(--btn-ink)}
+.hint-card span{display:grid;gap:2px}.hint-card b{color:var(--molu-ink)}
+.expense-row{padding:6px 0;border-top:1px solid var(--molu-line)}
+.expense-row>span:first-child{display:grid;gap:1px}
+.pack-row{padding:4px 0}
+/* 이번 주 도장 */
+.week-stamp{text-align:left}
+.week-stamp h2{font-size:16px}
+.stamps{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
+.stamp{display:grid;justify-items:center;gap:3px}
+.stamp i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:2px dashed var(--molu-line);font-style:normal;font-size:12px;font-weight:800;color:var(--molu-muted)}
+.stamp small{font-size:11px;font-weight:700;color:var(--molu-muted)}
+.stamp.today small{color:var(--molu-accent)}
+.stamp.today i{border-color:var(--molu-accent)}
+.stamp.future i{opacity:.4}
+.stamp.g-good i{border:0;background:var(--molu-ok);color:#fff;font-size:16px}
+.stamp.g-ok i{border:2px solid var(--molu-warning);color:var(--molu-warning)}
+.stamp.g-low i{border:2px solid var(--molu-error);color:var(--molu-error)}
+:root[data-molu-theme="dark"] .stamp.g-good i{color:#0a1427}
+.small-note{font-size:12px;margin:8px 0 0}
+/* 대화 빠른 문장 */
+.quick-chips{flex-basis:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.quick-chips button{flex:none;min-height:32px;padding:4px 12px;border-radius:99px;border:1px solid var(--btn-line);background:var(--btn-bg);color:var(--btn-ink);font-size:13px;font-weight:700}

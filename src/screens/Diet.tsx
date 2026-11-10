@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { mealColor, shortName } from '../domain/display';
+import { dinnerLabel, mealColor, shortName } from '../domain/display';
 import { useState } from 'react';
 import { Card, Field, SourceTag, Stat } from '../components/ui';
 import { adjustStock, newId, recordFinish, updateSettings } from '../db/actions';
@@ -186,8 +186,8 @@ export default function Diet({ data }: { data: AppData }) {
         </div>
         <div className="day-sum">
           <div><span className="muted">칼로리</span><b className="num">{formatNum(data.nutrition.kcal)}</b><small className="muted"> / {formatNum(data.settings.kcalTarget)}</small></div>
-          <div><span className="muted">단백질</span><b className="num">{formatNum(data.nutrition.protein, 1)}g</b><small className="muted"> / {data.settings.proteinTarget[0]}g</small></div>
-          <div><span className="muted">끼니</span><b className="num">{meals.length}번</b></div>
+          <div><span className="muted">단백질</span><b className="num">{formatNum(data.nutrition.protein, 1)}g</b><small className="muted"> / {data.settings.proteinTarget.join('~')}g</small></div>
+          <div><span className="muted">한 달 식비</span><b className="num">{formatNum(data.plan.total / 10000, 1)}만원</b></div>
         </div>
         <p className="muted" style={{ margin: '6px 0 0' }}>먹은 것 체크는 <b>기록</b> 탭에서 해요.</p>
       </section>
@@ -214,7 +214,7 @@ export default function Diet({ data }: { data: AppData }) {
                 );
               })}
               {bm.name === '저녁' && (
-                <li><span>집밥 ({data.dinnerToday === 'meat' ? '고기 있음' : data.dinnerToday === 'none' ? '고기 없음' : '덜 먹음'})</span><b className="num">1인분</b><small className="muted">{data.settings.dinner[data.dinnerToday].kcal}kcal</small></li>
+                <li><span>집밥 ({dinnerLabel('meat')})</span><b className="num">1인분</b><small className="muted">{data.settings.dinner.meat.kcal}kcal</small></li>
               )}
             </ul>
           )}

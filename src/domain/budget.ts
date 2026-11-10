@@ -39,7 +39,8 @@ export function summarizeBudget(input: {
   for (const e of inPeriod) byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount;
   const foodSpent = byCategory['식단'] ?? 0;
   const otherSpent = inPeriod.filter((e) => e.category !== '식단').reduce((s, e) => s + e.amount, 0);
-  const remaining = income - fixed - foodPlan - otherSpent;
+  // 식단은 계획만큼 미리 잡아 두고, 계획보다 더 샀으면 실제 구매액으로 뺀다
+  const remaining = income - fixed - Math.max(foodPlan, foodSpent) - otherSpent;
   const daysLeft = Math.max(1, Math.min(period.days, daysInclusive(today, period.end)));
   return {
     income,

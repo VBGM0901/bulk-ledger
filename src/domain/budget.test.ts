@@ -46,3 +46,12 @@ test('missing amounts are flagged, counted as 0', () => {
 test('last day of period has 1 day left', () => {
   expect(summarizeBudget({ incomes, recurring, foodPlan: 0, expenses: [], period, today: '2026-12-09' }).daysLeft).toBe(1);
 });
+
+test('buying more food than planned lowers the remaining budget', () => {
+  const s = summarizeBudget({
+    incomes, recurring, foodPlan: 100_000, period, today: '2026-11-10',
+    expenses: [{ id: 'a', date: '2026-11-11', amount: 130_000, category: '식단', memo: '', source: 'purchase' }],
+  });
+  const base = summarizeBudget({ incomes, recurring, foodPlan: 100_000, expenses: [], period, today: '2026-11-10' });
+  expect(base.remaining - s.remaining).toBe(30_000);
+});

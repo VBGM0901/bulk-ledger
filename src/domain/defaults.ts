@@ -85,11 +85,11 @@ export const DEFAULT_SETTINGS: Settings = {
   kcalTarget: 2800,
   proteinTarget: [90, 110], // 체중 54kg × 1.6~2.0g. 58kg쯤 되면 100~120으로
   weightGoal: null,
-  logScope: 'food',
   apiKey: '',
   lastBackupAt: null,
   theme: 'system',
   dinner: { meat: { kcal: 650, protein: 30 }, none: { kcal: 650, protein: 12 }, less: { kcal: 400, protein: 10 } },
   meals: DEFAULT_MEALS,
   profileNote: '',
+  migratedV: 1,
 };

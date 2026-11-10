@@ -34,7 +34,7 @@ test('grades and recent average', () => {
   const r = recentIntakePct('2026-11-10', 7, DEFAULT_FOODS, DEFAULT_SETTINGS, [], [
     { date: '2026-11-10', meals: all }, { date: '2026-11-08', meals: {} }, { date: '2026-11-01', meals: all },
   ])!;
-  expect(r.logged).toBe(2);
+  expect(r.logged).toBe(1); // 오늘(11-10)은 빼고, 11-08만 7일 안
   expect(recentIntakePct('2026-11-10', 7, DEFAULT_FOODS, DEFAULT_SETTINGS, [], [])).toBeNull();
 });
 

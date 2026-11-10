@@ -96,3 +96,33 @@ test('if the fallback option is rejected (400), it retries once without it', asy
   expect(out.text).toBe('네');
   expect(JSON.parse(f.mock.calls[1][1].body).fallbacks).toBeUndefined();
 });
+
+test('undo of one meal keeps the other meals and later edits', async () => {
+  const a = await runTool(db, data, 'record_eaten', { date: TODAY, meal: '아침', foods: [{ foodId: 'yogurt', qty: 1 }], home: 0 });
+  await runTool(db, data, 'record_eaten', { date: TODAY, meal: '점심', foods: [{ foodId: 'rice', qty: 1 }], home: 0 });
+  const x = await runTool(db, data, 'record_extra_food', { date: TODAY, name: '라면', kcal: 500, protein: 10 });
+  await undoAction(db, a);
+  const log = (await db.intakes.get(TODAY))!;
+  expect(log.items?.['아침']).toBeUndefined();
+  expect(log.items?.['점심']).toMatchObject({ rice: 1 });
+  await undoAction(db, x);
+  expect((await db.intakes.get(TODAY))!.extras ?? []).toEqual([]);
+});
+
+test('purchase at a different price records the paid amount and adds stock; 식단 expense is refused', async () => {
+  const label = data.foods.find((f) => f.id === 'banana')!.packOptions[0].label;
+  await runTool(db, data, 'record_food_purchase', { date: TODAY, items: [{ foodId: 'banana', packLabel: label, packs: 1, price: 3500 }] });
+  expect((await db.expenses.toArray())[0]).toMatchObject({ amount: 3500, category: '식단' });
+  expect(await db.stockEvents.where('foodId').equals('banana').count()).toBe(1);
+  await expect(runTool(db, data, 'record_expense', { date: TODAY, amount: 3500, category: '식단', memo: '바나나' })).rejects.toThrow('record_food_purchase');
+});
+
+test('if the API fails after something was recorded, the records come back instead of an error', async () => {
+  const f = vi.fn()
+    .mockResolvedValueOnce(reply({ stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'log_weight', input: { date: TODAY, kg: 54.2 } }] }))
+    .mockResolvedValueOnce(new Response('{}', { status: 429 }));
+  const out = await runChatTurn(db, () => data, [{ role: 'user', content: '몸무게 54.2' }], f);
+  expect(out.interrupted).toBe(true);
+  expect(out.actions).toHaveLength(1);
+  expect((await db.weights.get(TODAY))?.kg).toBe(54.2);
+});

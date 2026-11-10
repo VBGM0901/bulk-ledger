@@ -5,7 +5,6 @@ import type { DinnerChoice, DinnerLog, FoodItem, IntakeLog, ISODate, Meal, MealS
 export const HOME_KEY = '__home';
 
 export const STATUS_FACTOR: Record<MealStatus, number> = { all: 1, half: 0.5, none: 0 };
-export const STATUS_LABEL: Record<MealStatus, string> = { all: '다 먹음', half: '반쯤', none: '못 먹음' };
 
 export type IntakeGrade = 'good' | 'ok' | 'low';
 
@@ -79,13 +78,13 @@ export function dayIntake(
   };
 }
 
-/** 최근 n일 중 기록한 날들의 평균 달성률. 기록한 날이 없으면 null. */
+/** 어제까지 최근 n일 중 기록한 날들의 평균 달성률 (오늘은 아직 덜 먹었을 수 있어 뺀다). 기록한 날이 없으면 null. */
 export function recentIntakePct(
   today: ISODate, days: number,
   foods: FoodItem[], settings: Pick<Settings, 'meals' | 'dinner' | 'kcalTarget'>, dinners: DinnerLog[], intakes: IntakeLog[],
 ): { pct: number; logged: number } | null {
   const xs: number[] = [];
-  for (let i = 0; i < days; i++) {
+  for (let i = 1; i <= days; i++) {
     const d = dayIntake(addDays(today, -i), foods, settings, dinners, intakes);
     if (d) xs.push(d.pct);
   }
@@ -99,11 +98,4 @@ export function initialItems(meal: Meal, status: MealStatus | undefined): Record
   for (const it of meal.items) out[it.foodId] = (out[it.foodId] ?? 0) + it.qty * f;
   if (meal.name === '저녁') out[HOME_KEY] = f;
   return out;
-}
-
-/** 음식별 +/- 한 번에 바뀌는 양 */
-export function stepOf(unit: string, foodId: string): number {
-  if (foodId === HOME_KEY) return 0.5;
-  if (unit === 'g') return foodId === 'pb' ? 8 : 5;
-  return 0.5;
 }

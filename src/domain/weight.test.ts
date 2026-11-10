@@ -1,4 +1,5 @@
-import { goalWeightOn, movingAverage, weeklyRate } from './weight';
+import { addDays } from './dates';
+import { forecastDate, goalWeightOn, movingAverage, weeklyRate } from './weight';
 
 const logs = [
   { date: '2026-11-03', kg: 69.6 }, { date: '2026-11-05', kg: 70.0 }, { date: '2026-11-09', kg: 70.0 },
@@ -31,11 +32,23 @@ const rising = (perWeek: number) => flat.map((l, i) => ({ ...l, kg: 70 + (perWee
 test('bulk advice: data, eat plan first, add, on track, too fast', () => {
   expect(bulkAdvice([], goal, '2026-11-14', null).kind).toBe('need-data');
   expect(bulkAdvice(flat, goal, '2026-11-14', 0.7).kind).toBe('eat-plan');
-  const add = bulkAdvice(flat, goal, '2026-11-14', 0.98);
+  // 1주만 느림(2주 전 기록 없음) → 기다림
+  expect(bulkAdvice(flat, goal, '2026-11-14', 0.98).kind).toBe('wait');
+  // 3주 내내 그대로 → 2주 연속 느림 → +250
+  const flat3 = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-25', i), kg: 70 }));
+  const add = bulkAdvice(flat3, goal, '2026-11-14', 0.98);
   expect(add.kind).toBe('add');
   expect(add.kcalDelta).toBe(250);
-  expect(bulkAdvice(flat, goal, '2026-11-14', null).kind).toBe('add');
   expect(bulkAdvice(rising(0.45), goal, '2026-11-14', 1).kind).toBe('on-track');
   expect(bulkAdvice(rising(1.2), goal, '2026-11-14', 1).kind).toBe('too-fast');
   expect(bulkAdvice(flat, goal, '2026-11-14', null).targetRate).toBeCloseTo(6 / (92 / 7), 3);
+});
+
+test('forecast: date when the goal is reached at the current pace, null when not gaining', () => {
+  const g = { startKg: 70, targetKg: 72, startDate: '2026-10-25', endDate: '2027-01-25' };
+  const up = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-25', i), kg: 70 + (0.5 / 7) * i }));
+  const f = forecastDate(up, g, '2026-11-14')!;
+  expect(f > '2026-11-14' && f < '2026-12-01').toBe(true);
+  const flat3 = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-25', i), kg: 70 }));
+  expect(forecastDate(flat3, g, '2026-11-14')).toBeNull();
 });

@@ -1,8 +1,11 @@
+import { dinnerLabel } from '../domain/display';
 import { useState } from 'react';
 import { callClaude, MODELS } from '../claude/client';
+import { saveApiKey } from '../claude/key';
 import { Card, Field, Stat } from '../components/ui';
 import { newId, updateSettings } from '../db/actions';
-import { BackupError, exportBackup, importBackup } from '../db/backup';
+import { BackupError, exportBackup, importBackup, markBackedUp } from '../db/backup';
+import { addDays, todayISO } from '../domain/dates';
 import { db } from '../db/db';
 import { formatKRW, parseAmount } from '../domain/money';
 import type { WeightGoal } from '../domain/types';
@@ -30,7 +33,7 @@ export default function Settings({ data }: { data: AppData }) {
   const [keyDraft, setKeyDraft] = useState('');
   const [testing, setTesting] = useState(false);
   const s = data.settings;
-  const goal: WeightGoal = s.weightGoal ?? { startKg: data.weights.at(-1)?.kg ?? 60, targetKg: (data.weights.at(-1)?.kg ?? 60) + 5, startDate: data.today, endDate: data.today };
+  const goal: WeightGoal = s.weightGoal ?? { startKg: data.weights.at(-1)?.kg ?? 60, targetKg: (data.weights.at(-1)?.kg ?? 60) + 5, startDate: data.today, endDate: addDays(data.today, 90) };
   const ok = (text: string) => setMsg({ tone: 'ok', text });
   const fail = (text: string) => setMsg({ tone: 'err', text });
 
@@ -54,6 +57,7 @@ export default function Settings({ data }: { data: AppData }) {
     try {
       const file = await exportBackup(db);
       const how = await saveFile(`bulk-ledger-${data.today}.json`, JSON.stringify(file, null, 2));
+      await markBackedUp(db);
       ok(how === 'shared' ? '공유 시트에서 "파일에 저장"을 골라 iCloud Drive에 보관하세요.' : '백업 파일을 저장했어요.');
     } catch (e) {
       if ((e as Error).name !== 'AbortError') fail('백업 파일을 만들지 못했어요.');
@@ -63,7 +67,7 @@ export default function Settings({ data }: { data: AppData }) {
   async function testKey() {
     setTesting(true);
     try {
-      await callClaude({ apiKey: s.apiKey, model: MODELS.capture, system: '한 단어로 답해.', messages: [{ role: 'user', content: '연결 확인' }], maxTokens: 10 });
+      await callClaude({ apiKey: s.apiKey, model: MODELS.ping, system: '한 단어로 답해.', messages: [{ role: 'user', content: '연결 확인' }], maxTokens: 10 });
       ok('Claude 연결 OK');
     } catch (e) {
       fail((e as Error).message);
@@ -76,12 +80,14 @@ export default function Settings({ data }: { data: AppData }) {
     <>
       {msg && <p className={`card ${msg.tone}`} role={msg.tone === 'err' ? 'alert' : 'status'}>{msg.text}</p>}
 
-      <Card title="처음 설정">
-        <p className="muted">PC에서 받은 개인 데이터 파일(seed.json)을 폰에 옮긴 뒤 여기서 고르면 수입·고정비·체중 목표가 한 번에 들어가요.</p>
-        <Field label="개인 데이터 파일 합치기">
-          <input type="file" accept="application/json,.json" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f, 'merge'); e.target.value = ''; }} />
-        </Field>
-      </Card>
+      {data.needsSetup && (
+        <Card title="처음 설정">
+          <p className="muted">PC에서 받은 개인 데이터 파일(seed.json)을 폰에 옮긴 뒤 여기서 고르면 수입·고정비·체중 목표가 한 번에 들어가요.</p>
+          <Field label="개인 데이터 파일 합치기">
+            <input type="file" accept="application/json,.json" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f, 'merge'); e.target.value = ''; }} />
+          </Field>
+        </Card>
+      )}
 
       <Card title={`수입 (합계 ${formatKRW(data.summary.income)})`}>
         {data.incomes.map((i) => (
@@ -161,7 +167,7 @@ export default function Settings({ data }: { data: AppData }) {
       <Card title="저녁 집밥 추정치">
         {(['meat', 'none', 'less'] as const).map((k) => (
           <div key={k} className="row">
-            <span className="muted">{{ meat: '고기 반찬 있음', none: '고기 없음', less: '덜 먹음' }[k]}</span>
+            <span className="muted">{dinnerLabel(k)}</span>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input className="input small" aria-label={`${k} kcal`} key={`k${s.dinner[k].kcal}`} inputMode="numeric" defaultValue={s.dinner[k].kcal}
                 onBlur={(e) => { const v = Number(e.target.value); if (v >= 0) updateSettings(db, { dinner: { ...s.dinner, [k]: { ...s.dinner[k], kcal: v } } }); }} />
@@ -185,7 +191,14 @@ export default function Settings({ data }: { data: AppData }) {
         <div className="row">
           <button className="btn" disabled={!s.apiKey} onClick={() => window.confirm('API 키를 지울까요?') && updateSettings(db, { apiKey: '' })}>키 지우기</button>
           <button className="btn" disabled={!s.apiKey || testing} onClick={testKey}>{testing ? '확인 중…' : '연결 확인'}</button>
-          <button className="btn primary" disabled={!keyDraft.trim()} onClick={async () => { await updateSettings(db, { apiKey: keyDraft.trim() }); setKeyDraft(''); ok('API 키를 저장했어요.'); }}>저장</button>
+          <button className="btn primary" disabled={!keyDraft.trim() || testing} onClick={async () => {
+            setTesting(true);
+            const r = await saveApiKey(db, keyDraft);
+            setTesting(false);
+            if (r.tone !== 'err') setKeyDraft('');
+            if (r.tone === 'err') fail(r.text);
+            else ok(r.text);
+          }}>{testing ? '확인 중…' : '저장'}</button>
         </div>
       </Card>
 
@@ -198,11 +211,16 @@ export default function Settings({ data }: { data: AppData }) {
       </Card>
 
       <Card title="백업">
-        <Stat label="마지막 백업" value={s.lastBackupAt ? s.lastBackupAt.slice(0, 10) : '없음'} tone={data.backupStale ? 'warn' : 'ok'} />
+        <Stat label="마지막 백업" value={s.lastBackupAt ? todayISO(new Date(s.lastBackupAt)) : '없음'} tone={data.backupStale ? 'warn' : 'ok'} />
         <button className="btn primary block" onClick={onExport}>백업 파일 저장</button>
         <Field label="백업 불러오기 (지금 데이터를 교체)">
           <input type="file" accept="application/json,.json" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f, 'replace'); e.target.value = ''; }} />
         </Field>
+        {!data.needsSetup && (
+          <Field label="개인 데이터 파일 합치기 (지금 데이터는 유지)">
+            <input type="file" accept="application/json,.json" onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f, 'merge'); e.target.value = ''; }} />
+          </Field>
+        )}
       </Card>
 
       <Card title="화면">

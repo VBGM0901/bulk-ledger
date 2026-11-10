@@ -1,19 +1,13 @@
 import type { Screen } from '../App';
 import { Bar, Card, Notice, Stat } from '../components/ui';
-import { setDinner } from '../db/actions';
-import { db } from '../db/db';
 import { depletionDate } from '../domain/consumption';
 import { addDays } from '../domain/dates';
 import { formatKRW, formatNum } from '../domain/money';
-import type { DinnerChoice } from '../domain/types';
-import { goalWeightOn, movingAverage } from '../domain/weight';
+import { shortName } from '../domain/display';
+import { dayIntake } from '../domain/intake';
+import { forecastDate, goalWeightOn, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
-const DINNER: { id: DinnerChoice; label: string }[] = [
-  { id: 'meat', label: '고기 있음' },
-  { id: 'none', label: '고기 없음' },
-  { id: 'less', label: '덜 먹음' },
-];
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
 export default function Home({ data, navigate }: { data: AppData; navigate: (s: Screen) => void }) {
@@ -23,7 +17,6 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
   const soonLimit = addDays(data.today, 3);
   const tracked = new Set(data.stockEvents.map((e) => e.foodId));
   const planned = data.foods.filter((f) => !f.free && (data.dailyUse[f.id] ?? 0) > 0);
-  const untracked = planned.filter((f) => !tracked.has(f.id));
   const soon = planned
     .filter((f) => tracked.has(f.id))
     .map((f) => ({ f, date: depletionDate(data.stock[f.id] ?? 0, data.dailyUse[f.id], data.today) }))
@@ -46,42 +39,41 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
         </button>
       )}
       {s.missing.length > 0 && <Notice tone="warn">미입력: {s.missing.join(', ')} — 설정에서 입력하세요.</Notice>}
-      {s.overBudget && !data.needsSetup && <Notice tone="err">계획 지출이 수입보다 {formatKRW(-s.remaining)} 많아요.</Notice>}
-      {data.plan.missing.length > 0 && <Notice tone="warn">가격이 없는 식품이 있어 식단비가 덜 잡혔어요: {data.plan.missing.join(', ')}</Notice>}
+      {s.overBudget && !data.needsSetup && <Notice tone="err">고정비·식단 계획·쓴 돈을 합치면 수입보다 {formatKRW(-s.remaining)} 많아요.</Notice>}
+      {data.plan.missing.length > 0 && <Notice tone="warn">가격이 없는 식품이 있어 식단비가 덜 잡혔어요: {data.plan.missing.map((id) => shortName(data.foods.find((f) => f.id === id))).join(', ')}</Notice>}
       {data.backupStale && (
         <button className="card warn" style={{ textAlign: 'left' }} onClick={() => navigate('settings')}>
           백업한 지 7일이 넘었어요. 눌러서 백업하기
         </button>
       )}
 
-      <Card title="오늘 먹을 것 (계획)" action={<button className="btn" onClick={() => navigate('diet')}>식단</button>}>
-        <Stat
-          label="칼로리"
-          value={`${formatNum(n.kcal)} / ${formatNum(settings.kcalTarget)} kcal`}
-          tone={n.kcal >= settings.kcalTarget * 0.97 ? 'ok' : 'warn'}
-        />
-        <Bar value={n.kcal} max={settings.kcalTarget} label="칼로리 목표 대비" />
-        <Stat
-          label="단백질"
-          value={`${formatNum(n.protein, 1)} g`}
-          sub={`목표 ${settings.proteinTarget[0]}~${settings.proteinTarget[1]}g`}
-          tone={n.protein >= settings.proteinTarget[0] ? 'ok' : 'warn'}
-        />
-        <Stat
-          label="실제로 먹은 것"
-          value={data.todayIntake ? `${formatNum(data.todayIntake.kcal)} kcal (${Math.round(data.todayIntake.pct * 100)}%)` : '아직 체크 안 함'}
-          tone={data.todayIntake ? (data.todayIntake.grade === 'good' ? 'ok' : 'warn') : undefined}
-        />
-        <button className="btn block" style={{ marginTop: 6 }} onClick={() => navigate('log')}>오늘 먹은 것 체크하기</button>
-        <p className="muted" style={{ margin: '10px 0 6px' }}>오늘 저녁</p>
-        <div className="seg">
-          {DINNER.map((d) => (
-            <button key={d.id} aria-pressed={data.dinnerToday === d.id} onClick={() => setDinner(db, data.today, d.id)}>
-              {d.label}
-            </button>
-          ))}
-        </div>
+      <Card title="오늘 먹은 것" action={<button className="btn primary" onClick={() => navigate('log')}>체크하기</button>}>
+        {(() => {
+          const it = data.todayIntake;
+          const kcal = it?.kcal ?? 0;
+          const protein = it?.protein ?? 0;
+          return (
+            <>
+              <Stat
+                label="칼로리"
+                value={`${formatNum(kcal)} / ${formatNum(settings.kcalTarget)} kcal`}
+                sub={it ? `${Math.round(it.pct * 100)}%` : '아직 체크 안 함'}
+                tone={it ? (it.grade === 'good' ? 'ok' : 'warn') : undefined}
+              />
+              <Bar value={kcal} max={settings.kcalTarget} label="오늘 칼로리 목표 대비" />
+              <Stat
+                label="단백질"
+                value={`${formatNum(protein, 1)} g`}
+                sub={`목표 ${settings.proteinTarget[0]}~${settings.proteinTarget[1]}g`}
+                tone={it ? (protein >= settings.proteinTarget[0] ? 'ok' : 'warn') : undefined}
+              />
+              <p className="muted" style={{ margin: '6px 0 0' }}>계획대로 다 먹으면 {formatNum(n.kcal)}kcal · 단백질 {formatNum(n.protein, 1)}g</p>
+            </>
+          );
+        })()}
       </Card>
+
+      <WeekStamp data={data} onOpen={() => navigate('log')} />
 
       <Card title="이번 달 돈" action={<button className="btn" onClick={() => navigate('spend')}>지출</button>}>
         <Stat label="수입" value={formatKRW(s.income)} />
@@ -94,14 +86,13 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
       <Card title="체중" action={<button className="btn" onClick={() => navigate('log')}>기록</button>}>
         <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
         <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
+        {goal && (() => {
+          const f = forecastDate(data.weights, goal, data.today);
+          return f ? <Stat label={`${goal.targetKg}kg 도달 예상`} value={`${Number(f.slice(5, 7))}월 ${Number(f.slice(8))}일쯤`} tone={f <= goal.endDate ? 'ok' : 'warn'} /> : null;
+        })()}
         {goal && <Stat label="오늘 목표선" value={`${formatNum(goalWeightOn(goal, data.today), 1)} kg`} sub={`최종 ${goal.targetKg}kg`} />}
       </Card>
 
-      {untracked.length > 0 && (
-        <button className="card muted" style={{ textAlign: 'left' }} onClick={() => navigate('diet')}>
-          재고 기록이 없는 식품 {untracked.length}개 — 식단 화면에서 "지금 재고 맞추기"를 한 번 입력하면 장보기 알림이 정확해져요.
-        </button>
-      )}
       {soon.length > 0 && (
         <Card title="곧 사야 함" action={<button className="btn" onClick={() => navigate('shopping')}>장보기</button>}>
           {soon.map(({ f, date }) => (
@@ -110,5 +101,34 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
         </Card>
       )}
     </>
+  );
+}
+
+const WEEK = ['월', '화', '수', '목', '금', '토', '일'];
+
+/** 이번 주(월~일) 7칸 도장. 하루 빠져도 0으로 돌아가지 않는다. */
+function WeekStamp({ data, onOpen }: { data: AppData; onOpen: () => void }) {
+  const dow = (new Date(`${data.today}T00:00:00`).getDay() + 6) % 7; // 월=0
+  const monday = addDays(data.today, -dow);
+  const days = WEEK.map((w, i) => {
+    const date = addDays(monday, i);
+    return { w, date, it: dayIntake(date, data.foods, data.settings, data.dinners, data.intakes), future: date > data.today };
+  });
+  const good = days.filter((d) => d.it?.grade === 'good').length;
+  return (
+    <button className="card week-stamp" onClick={onOpen} aria-label={`이번 주 잘 먹은 날 ${good}일. 눌러서 기록 보기`}>
+      <div className="row">
+        <h2>이번 주</h2>
+        <span className="muted"><b className="num ok">{good}</b> / 7일 잘 먹음</span>
+      </div>
+      <div className="stamps">
+        {days.map((d) => (
+          <span key={d.date} className={`stamp ${d.it ? `g-${d.it.grade}` : ''} ${d.future ? 'future' : ''} ${d.date === data.today ? 'today' : ''}`}>
+            <i>{d.it?.grade === 'good' ? '✓' : d.it ? `${Math.round(d.it.pct * 100)}` : ''}</i>
+            <small>{d.w}</small>
+          </span>
+        ))}
+      </div>
+    </button>
   );
 }

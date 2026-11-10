@@ -2,7 +2,7 @@ import { deleteExpense, recordExpense, recordPurchase } from '../db/actions';
 import type { AppDB } from '../db/db';
 import { HOME_KEY } from '../domain/intake';
 import { formatKRW, formatNum } from '../domain/money';
-import { EXPENSE_CATEGORIES, type ChatAction, type ExpenseCategory, type IntakeLog, type ISODate, type PurchaseLine } from '../domain/types';
+import { EXPENSE_CATEGORIES, type ChatAction, type ExpenseCategory, type IntakeLog, type ISODate, type MealStatus, type PurchaseLine } from '../domain/types';
 import type { AppData } from '../state/useAppData';
 import { buildChatContext } from './chat';
 import { callClaudeRaw, ClaudeError, MODELS, type ApiBlock, type ApiMessage, type ApiTool } from './client';
@@ -45,21 +45,21 @@ export function buildTools(d: AppData): ApiTool[] {
       name: 'record_food_purchase',
       description:
         '앱에 등록된 식품(쿠팡 등)을 산 것을 기록한다. 금액은 등록된 팩 가격으로 자동 계산되고 재고도 늘어난다. ' +
-        'packLabel은 식품 목록의 포장 이름과 정확히 같아야 한다. 가격이 다르면 record_expense를 대신 쓴다.',
+        'packLabel은 식품 목록의 포장 이름과 정확히 같아야 한다. 실제로 낸 돈이 등록 가격과 다르면 price에 그 줄의 총액(원)을, 같거나 모르면 0을 넣는다.',
       strict: true,
       input_schema: obj({
         date,
-        items: { type: 'array', items: obj({ foodId: { type: 'string', enum: foodIds }, packLabel: { type: 'string' }, packs: { type: 'integer' } }) },
+        items: { type: 'array', items: obj({ foodId: { type: 'string', enum: foodIds }, packLabel: { type: 'string' }, packs: { type: 'integer' }, price: { type: 'integer', description: '이 줄에 실제로 낸 총액(원). 등록 가격대로면 0' } }) },
       }),
     },
     {
       name: 'record_expense',
-      description: '지출을 기록한다 (등록 식품이 아닌 것, 외식, 생활용품 등). 금액은 원 단위 정수.',
+      description: '지출을 기록한다 (등록 식품이 아닌 것, 외식, 편의점, 생활용품 등). 등록 식품을 샀으면 이 도구 말고 record_food_purchase. 금액은 원 단위 정수.',
       strict: true,
       input_schema: obj({
         date,
         amount: { type: 'integer' },
-        category: { type: 'string', enum: [...EXPENSE_CATEGORIES] },
+        category: { type: 'string', enum: EXPENSE_CATEGORIES.filter((c) => c !== '식단') },
         memo: { type: 'string', description: '무엇을 샀는지 짧게' },
       }),
     },
@@ -80,6 +80,13 @@ function checkDate(v: unknown, today: ISODate): ISODate {
 
 async function snapshotIntake(db: AppDB, date: ISODate): Promise<IntakeLog | null> {
   return (await db.intakes.get(date)) ?? null;
+}
+
+/** 되돌리기용: 바꾸기 전 그 끼니들의 상태만 기억한다 (다른 끼니·나중 수정은 건드리지 않게) */
+function mealSnapshot(log: IntakeLog | null, meals: string[]) {
+  const out: Record<string, { status?: MealStatus; items?: Record<string, number> }> = {};
+  for (const m of meals) out[m] = { status: log?.meals[m], items: log?.items?.[m] };
+  return out;
 }
 
 /** 도구 하나 실행. 성공하면 사용자에게 보일 요약과 되돌리기 정보를 돌려준다. */
@@ -107,7 +114,7 @@ export async function runTool(db: AppDB, d: AppData, name: string, input: Record
       await db.intakes.put(next);
       const eaten = foods.filter((f) => f.qty > 0).map((f) => `${foodName(f.foodId)} ${formatNum(f.qty, f.qty % 1 ? 1 : 0)}${unit(f.foodId)}`);
       if (meal === '저녁' && items[HOME_KEY] > 0) eaten.push(`집밥 ${items[HOME_KEY] === 1 ? '' : `${items[HOME_KEY]}인분`}`.trim());
-      return { summary: `${date.slice(5)} ${meal}: ${eaten.join(', ') || '안 먹음'}`, undo: { kind: 'intake', date, prev } };
+      return { summary: `${date.slice(5)} ${meal}: ${eaten.join(', ') || '안 먹음'}`, undo: { kind: 'meals', date, prev: mealSnapshot(prev, [meal]) } };
     }
     case 'mark_meals_all_eaten': {
       const date = checkDate(input.date, d.today);
@@ -122,7 +129,7 @@ export async function runTool(db: AppDB, d: AppData, name: string, input: Record
       }
       next.items = items;
       await db.intakes.put(next);
-      return { summary: `${date.slice(5)} ${meals.join('·')} 다 먹음`, undo: { kind: 'intake', date, prev } };
+      return { summary: `${date.slice(5)} ${meals.join('·')} 다 먹음`, undo: { kind: 'meals', date, prev: mealSnapshot(prev, meals) } };
     }
     case 'record_extra_food': {
       const date = checkDate(input.date, d.today);
@@ -133,21 +140,23 @@ export async function runTool(db: AppDB, d: AppData, name: string, input: Record
       if (!(kcal >= 0 && kcal < 5000) || !(protein >= 0 && protein < 300)) throw new Error('칼로리·단백질 값을 확인해 주세요.');
       const prev = await snapshotIntake(db, date);
       const next: IntakeLog = { ...(prev ?? { date, meals: {} }), date };
-      next.extras = [...(prev?.extras ?? []), { id: crypto.randomUUID(), name: nm, kcal, protein }];
+      const extraId = crypto.randomUUID();
+      next.extras = [...(prev?.extras ?? []), { id: extraId, name: nm, kcal, protein }];
       await db.intakes.put(next);
-      return { summary: `${date.slice(5)} 추가 음식: ${nm} ${kcal}kcal · P ${protein}g`, undo: { kind: 'intake', date, prev } };
+      return { summary: `${date.slice(5)} 추가 음식: ${nm} ${kcal}kcal · P ${protein}g`, undo: { kind: 'extra', date, extraId } };
     }
     case 'record_food_purchase': {
       const date = checkDate(input.date, d.today);
       const lines: PurchaseLine[] = [];
-      for (const it of (input.items as { foodId: string; packLabel: string; packs: number }[]) ?? []) {
+      for (const it of (input.items as { foodId: string; packLabel: string; packs: number; price?: number }[]) ?? []) {
         const f = d.foods.find((x) => x.id === it.foodId);
         if (!f) throw new Error(`없는 식품이에요: ${it.foodId}`);
         const opt = f.packOptions.find((o) => o.label === it.packLabel);
         if (!opt) throw new Error(`${f.name}의 포장 이름은 다음 중 하나예요: ${f.packOptions.map((o) => o.label).join(', ')}`);
         if (!(Number.isInteger(it.packs) && it.packs > 0 && it.packs < 100)) throw new Error('팩 수를 확인해 주세요.');
-        if (!(opt.price > 0)) throw new Error(`${f.name} ${opt.label} 가격이 없어요. record_expense로 금액을 직접 기록하세요.`);
-        lines.push({ foodId: f.id, packLabel: opt.label, packs: it.packs, qtyAdded: opt.qty * it.packs, price: opt.price * it.packs });
+        const paid = Number.isInteger(it.price) && (it.price as number) > 0 ? (it.price as number) : opt.price * it.packs;
+        if (!(paid > 0)) throw new Error(`${f.name} ${opt.label} 가격이 없어요. 낸 금액을 price에 넣어 주세요.`);
+        lines.push({ foodId: f.id, packLabel: opt.label, packs: it.packs, qtyAdded: opt.qty * it.packs, price: paid });
       }
       const { expenseId } = await recordPurchase(db, { date, lines, source: 'purchase' });
       const total = lines.reduce((s, l) => s + l.price, 0);
@@ -159,7 +168,7 @@ export async function runTool(db: AppDB, d: AppData, name: string, input: Record
     case 'record_expense': {
       const date = checkDate(input.date, d.today);
       const category = String(input.category) as ExpenseCategory;
-      if (!(EXPENSE_CATEGORIES as readonly string[]).includes(category)) throw new Error('카테고리를 확인해 주세요.');
+      if (!(EXPENSE_CATEGORIES as readonly string[]).includes(category) || category === '식단') throw new Error('카테고리를 확인해 주세요. 등록 식품 구매는 record_food_purchase로 기록해요.');
       const amount = Number(input.amount);
       const memo = String(input.memo ?? '');
       const expenseId = await recordExpense(db, { date, amount, category, memo, source: 'manual' });
@@ -185,6 +194,23 @@ export async function undoAction(db: AppDB, a: ChatAction): Promise<void> {
   else if (u.kind === 'intake') {
     if (u.prev) await db.intakes.put(u.prev);
     else await db.intakes.delete(u.date);
+  } else if (u.kind === 'meals' || u.kind === 'extra') {
+    const cur = await db.intakes.get(u.date);
+    const log: IntakeLog = cur ? structuredClone(cur) : { date: u.date, meals: {} };
+    if (u.kind === 'extra') log.extras = (log.extras ?? []).filter((e) => e.id !== u.extraId);
+    else {
+      const items = { ...(log.items ?? {}) };
+      for (const [m, p] of Object.entries(u.prev)) {
+        if (p.status) log.meals[m] = p.status;
+        else delete log.meals[m];
+        if (p.items) items[m] = p.items;
+        else delete items[m];
+      }
+      log.items = items;
+    }
+    const empty = Object.keys(log.meals).length === 0 && Object.keys(log.items ?? {}).length === 0 && (log.extras ?? []).length === 0;
+    if (empty) await db.intakes.delete(u.date);
+    else await db.intakes.put(log);
   } else if (u.kind === 'weight') {
     if (u.prev === null) await db.weights.delete(u.date);
     else await db.weights.put({ date: u.date, kg: u.prev });
@@ -195,12 +221,12 @@ const SYSTEM = [
   '너는 사용자의 개인 증량·가계부 비서다. 사용자는 건강하게 체중을 늘리는 중이다.',
   '사용자가 "~샀어", "~먹었어", "~원 나갔어", "몸무게 ~kg" 처럼 말하면 확인을 묻지 말고 바로 도구로 기록한다. 기록한 뒤 무엇을 기록했는지 한두 줄로 알려준다(사용자는 화면의 되돌리기 버튼으로 취소할 수 있다).',
   '먹은 것: 계획 끼니 안의 음식이면 record_eaten (그 끼니에서 먹은 것만), 끼니를 통째로 다 먹었으면 mark_meals_all_eaten, 계획에 없던 음식이면 record_extra_food.',
-  '산 것: 등록 식품을 등록된 포장으로 샀으면 record_food_purchase, 그 외에는 record_expense. 금액이 애매하면 기록하지 말고 물어본다.',
+  '산 것: 등록 식품을 샀으면 record_food_purchase (값이 달랐으면 price에 실제 금액), 그 외에는 record_expense. 금액이 애매하면 기록하지 말고 물어본다.',
   '날짜를 말하지 않으면 오늘로 기록한다. 사진(영수증·주문 캡처·음식 사진)이 오면 내용을 읽고 같은 규칙으로 기록한다.',
   '질문에는 존댓말로 짧고 구체적으로 답한다. 숫자는 아래 데이터만 근거로 계산하고, 없으면 모른다고 한다. 식단을 늘리자고 할 때는 kcal·단백질 변화와 월 비용 변화를 함께 말한다. 의료 진단은 하지 않는다.',
 ].join('\n');
 
-export interface AgentResult { text: string; actions: ChatAction[]; errors: string[] }
+export interface AgentResult { text: string; actions: ChatAction[]; errors: string[]; interrupted?: boolean }
 
 /**
  * 대화 한 턴: 도구 호출이 끝날 때까지 반복한다. 도구 실패는 Claude에게 알려서 고치거나 사용자에게 묻게 한다.
@@ -217,7 +243,9 @@ export async function runChatTurn(
   const messages: ApiMessage[] = [...history];
   for (let step = 0; step < 8; step++) {
     const d = getData();
-    const res = await callClaudeRaw({
+    let res;
+    try {
+      res = await callClaudeRaw({
       apiKey: d.settings.apiKey,
       model: MODELS.chat,
       system: `${SYSTEM}\n\n[앱 데이터]\n${buildChatContext(d)}`,
@@ -226,7 +254,12 @@ export async function runChatTurn(
       effort: 'low',
       fallbacks: true,
       fetchImpl,
-    });
+      });
+    } catch (e) {
+      // 이미 기록한 게 있으면 잃어버리지 않게 돌려준다 (다시 보내면 중복 기록되므로)
+      if (actions.length) return { text: '', actions, errors: [...errors, (e as Error).message], interrupted: true };
+      throw e;
+    }
     if (res.stop_reason === 'refusal') throw new ClaudeError('bad_response', '이 요청에는 답할 수 없어요');
     // 사고(thinking) 블록 포함 응답 전체를 그대로 이어 붙인다
     messages.push({ role: 'assistant', content: res.content });

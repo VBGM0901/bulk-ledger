@@ -78,6 +78,18 @@ export async function setMealStatus(db: AppDB, date: ISODate, meal: string, stat
 }
 
 /** 하루 끼니를 한 번에 '다 먹음'으로 (추가 음식은 유지). */
+/** 그 전날 체크한 끼니를 그대로 가져온다 (추가 음식은 빼고). 전날 기록이 없으면 false. */
+export async function copyDayMeals(db: AppDB, from: ISODate, to: ISODate): Promise<boolean> {
+  const src = await db.intakes.get(from);
+  if (!src || (Object.keys(src.meals).length === 0 && Object.keys(src.items ?? {}).length === 0)) return false;
+  await updateIntake(db, to, (log) => {
+    log.meals = { ...src.meals };
+    log.items = src.items ? structuredClone(src.items) : undefined;
+    if (!log.items) delete log.items;
+  });
+  return true;
+}
+
 export async function markAllEaten(db: AppDB, date: ISODate, mealNames: string[]): Promise<void> {
   await updateIntake(db, date, (log) => {
     log.meals = Object.fromEntries(mealNames.map((m) => [m, 'all' as const]));
@@ -95,6 +107,8 @@ export async function setItemQty(
   await updateIntake(db, date, (log) => {
     const items = { ...(log.items ?? {}) };
     items[meal] = { ...(items[meal] ?? initial), [foodId]: Math.round(qty * 100) / 100 };
+    // 체크를 전부 풀면 '0% 먹은 끼니'가 아니라 '기록 안 함'으로 되돌린다
+    if (Object.values(items[meal]).every((q) => q === 0)) delete items[meal];
     log.items = items;
     delete log.meals[meal];
   });

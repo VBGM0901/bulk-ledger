@@ -64,7 +64,7 @@ export default function App() {
           <>
             {screen === 'home' && <Home data={data} navigate={navigate} />}
             {screen === 'diet' && <Diet data={data} />}
-            {screen === 'spend' && <Spend data={data} />}
+            {screen === 'spend' && <Spend data={data} navigate={navigate} />}
             {screen === 'log' && <Log data={data} />}
             {screen === 'more' && <More navigate={navigate} />}
             {screen === 'shopping' && <Shopping data={data} />}

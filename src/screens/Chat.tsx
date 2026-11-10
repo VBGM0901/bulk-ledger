@@ -3,10 +3,10 @@ import { ArrowUp, Check, ImagePlus, Undo2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../App';
 import { runChatTurn, undoAction } from '../claude/agent';
-import { callClaude, ClaudeError, MODELS } from '../claude/client';
+import { saveApiKey } from '../claude/key';
 import type { ApiMessage } from '../claude/client';
 import { prepareImage } from '../claude/image';
-import { newId, updateSettings } from '../db/actions';
+import { newId } from '../db/actions';
 import { db } from '../db/db';
 import type { ChatMessage } from '../domain/types';
 import type { AppData } from '../state/useAppData';
@@ -18,6 +18,8 @@ const SUGGEST = [
   '몸무게 54.3',
   '이번 주 내 식사 어때? 뭘 더 먹을까?',
 ];
+/** 입력칸 위 빠른 문장. 끝이 공백이면 입력칸에 넣고 이어 쓰게, 아니면 바로 보낸다 */
+const QUICK = ['오늘 다 먹었어', '아침 다 먹었어', '점심 다 먹었어', '몸무게 ', '편의점 ', '오늘 얼마 남았어?'];
 /** API에 보내는 최근 메시지 수 (비용·속도 조절) */
 const HISTORY = 20;
 
@@ -33,30 +35,13 @@ function KeySetup({ onMore }: { onMore: () => void }) {
   const [msg, setMsg] = useState<{ tone: 'err' | 'warn'; text: string } | null>(null);
 
   async function save() {
-    const k = key.trim();
-    if (!k) return;
-    if (!k.startsWith('sk-ant-')) {
-      setMsg({ tone: 'err', text: 'API 키는 sk-ant- 로 시작해요. Console에서 복사한 키 전체를 붙여넣어 주세요.' });
-      return;
-    }
+    if (!key.trim()) return;
     setBusy(true);
     setMsg(null);
-    try {
-      await callClaude({ apiKey: k, model: MODELS.capture, system: '한 단어로 답해.', messages: [{ role: 'user', content: '연결 확인' }], maxTokens: 10 });
-      await updateSettings(db, { apiKey: k });
-      setKey('');
-    } catch (e) {
-      if (e instanceof ClaudeError && e.kind === 'auth') {
-        setMsg({ tone: 'err', text: '이 키로는 연결이 안 돼요. 키를 다시 복사했는지, Console에서 삭제·만료되지 않았는지 확인해 주세요.' });
-      } else {
-        // 인터넷·한도 문제 등은 키 자체의 문제가 아닐 수 있어 저장은 해 둔다
-        await updateSettings(db, { apiKey: k });
-        setKey('');
-        setMsg({ tone: 'warn', text: `키는 저장했지만 연결 확인은 못 했어요: ${(e as Error).message}` });
-      }
-    } finally {
-      setBusy(false);
-    }
+    const r = await saveApiKey(db, key);
+    setBusy(false);
+    if (r.tone !== 'err') setKey('');
+    if (r.tone !== 'ok') setMsg({ tone: r.tone, text: r.text });
   }
 
   return (
@@ -89,7 +74,9 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const dataRef = useRef(data);
-  dataRef.current = data;
+  useEffect(() => {
+    dataRef.current = data; // 도구 실행 중에도 최신 앱 데이터를 읽도록
+  }, [data]);
   const hasKey = Boolean(data.settings.apiKey);
 
   useEffect(() => {
@@ -119,8 +106,11 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
         : { role: 'user', content: q };
       const out = await runChatTurn(db, () => dataRef.current, [...past, now]);
       const at = new Date(Math.max(Date.now(), Date.parse(userMsg.at) + 1)).toISOString();
-      const extra = out.errors.length && !out.actions.length ? `\n(기록 못 함: ${out.errors[0]})` : '';
-      await db.chats.put({ id: newId(), at, role: 'assistant', content: (out.text || '알겠어요.') + extra, actions: out.actions });
+      const extra = out.interrupted
+        ? `(아래까지는 기록했는데 중간에 끊겼어요: ${out.errors.at(-1)})`
+        : out.errors.length && !out.actions.length ? `\n(기록 못 함: ${out.errors[0]})` : '';
+      const text = out.interrupted ? extra : (out.text || '알겠어요.') + extra;
+      await db.chats.put({ id: newId(), at, role: 'assistant', content: text, actions: out.actions });
     } catch (e) {
       await db.chats.delete(userMsg.id);
       setInput(q);
@@ -212,6 +202,13 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
           <div className="attach-preview">
             <img src={image.url} alt="첨부할 사진" />
             <button type="button" className="btn icon small" aria-label="사진 빼기" onClick={() => setImage(null)}><X size={14} aria-hidden /></button>
+          </div>
+        )}
+        {hasKey && msgs.length > 0 && !image && (
+          <div className="quick-chips" aria-label="빠른 문장">
+            {QUICK.map((q) => (
+              <button key={q} type="button" onClick={() => (q.endsWith(' ') ? setInput(q) : send(q))} disabled={busy}>{q.trim()}</button>
+            ))}
           </div>
         )}
         <label className={`btn icon attach ${!hasKey ? 'disabled' : ''}`} aria-label="사진 첨부">

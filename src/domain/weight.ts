@@ -21,7 +21,25 @@ export function weeklyRate(logs: WeightLog[], today: ISODate): number | null {
   return now === null || prev === null ? null : now - prev;
 }
 
-export type AdviceKind = 'need-data' | 'eat-plan' | 'add' | 'on-track' | 'too-fast';
+/** 오늘 7일 평균 − 14일 전 7일 평균을 주 단위로 (2주 평균 속도) */
+export function twoWeekRate(logs: WeightLog[], today: ISODate): number | null {
+  const now = movingAverage(logs, today);
+  const prev = movingAverage(logs, addDays(today, -14));
+  return now === null || prev === null ? null : (now - prev) / 2;
+}
+
+/** 지금 속도(7일 평균 기준)로 목표 체중에 닿는 날 (직선 연장이라 '예상'). 늘지 않으면 null */
+export function forecastDate(logs: WeightLog[], goal: WeightGoal | null, today: ISODate): ISODate | null {
+  if (!goal) return null;
+  const rate = twoWeekRate(logs, today) ?? weeklyRate(logs, today);
+  const now = movingAverage(logs, today);
+  if (rate === null || now === null || rate < 0.05) return null;
+  if (now >= goal.targetKg) return today;
+  const days = Math.ceil(((goal.targetKg - now) / rate) * 7);
+  return days > 730 ? null : addDays(today, days);
+}
+
+export type AdviceKind = 'need-data' | 'eat-plan' | 'wait' | 'add' | 'on-track' | 'too-fast';
 export interface BulkAdvice {
   kind: AdviceKind;
   /** 하루 칼로리를 얼마나 바꾸면 좋은지 (+면 늘리기) */
@@ -57,7 +75,12 @@ export function bulkAdvice(
     if (intakePct !== null && intakePct < 0.9) {
       return { ...base, kind: 'eat-plan', kcalDelta: 0, title: '먼저 계획량을 다 먹는 게 우선이에요', detail: `최근 기록 평균 ${Math.round(intakePct * 100)}%만 먹었어요. 식단을 늘리기 전에 지금 계획부터 다 먹어 보세요.` };
     }
-    return { ...base, kind: 'add', kcalDelta: 250, title: '하루 250kcal 더 먹어 보세요', detail: '다 먹는데도 잘 안 늘어요. 예: 바나나 1개 + 땅콩버터 1스푼(16g), 또는 식빵 1조각 + 땅콩버터 1스푼.' };
+    // 한 주만 느린 건 수분·변동일 수 있어서, 2주 연속 느릴 때만 늘린다 (MacroFactor처럼 충분히 쌓인 뒤 조정)
+    const rate14 = twoWeekRate(logs, today);
+    if (rate14 === null || rate14 >= want * 0.5) {
+      return { ...base, kind: 'wait', kcalDelta: 0, title: '이번 주는 조금 느려요. 1주 더 지켜봐요', detail: '체중은 물·소금 때문에 며칠씩 출렁여요. 2주 연속 느리면 그때 늘리자고 알려드릴게요.' };
+    }
+    return { ...base, kind: 'add', kcalDelta: 250, title: '하루 250kcal 더 먹어 보세요', detail: '2주째 다 먹는데도 잘 안 늘어요. 예: 바나나 1개 + 땅콩버터 1스푼(16g), 또는 우유 200ml + 식빵 1조각.' };
   }
   return { ...base, kind: 'on-track', kcalDelta: 0, title: '지금 페이스 좋아요', detail: '이대로 계속 먹으면 돼요.' };
 }
