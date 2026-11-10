@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
-import { Bar, Card, Stat } from '../components/ui';
+import { Bar, Card } from '../components/ui';
 import { copyDayMeals, deleteWeight, logWeight, markAllEaten } from '../db/actions';
 import { db } from '../db/db';
 import { addDays, dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
@@ -33,11 +33,6 @@ export default function Log({ data }: { data: AppData }) {
   const intakeOf = (d: ISODate) => dayIntake(d, data.foods, data.settings, data.dinners, data.intakes);
   const weightOf = (d: ISODate) => data.weights.find((w) => w.date === d)?.kg ?? null;
 
-  // 월 요약
-  const logged = days.map(intakeOf).filter((x): x is DayIntake => x !== null);
-  const avgPct = logged.length ? logged.reduce((s, x) => s + x.pct, 0) / logged.length : null;
-  const monthWeights = data.weights.filter((w) => w.date.startsWith(month.slice(0, 7)));
-  const wChange = monthWeights.length >= 2 ? monthWeights[monthWeights.length - 1].kg - monthWeights[0].kg : null;
   const [y, m] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
   const isCurrentMonth = month === monthStart(data.today);
 
@@ -81,12 +76,6 @@ export default function Log({ data }: { data: AppData }) {
           <span><i className="dot g-low" />부족</span>
           <span>아래 숫자 = 체중</span>
         </div>
-        <Stat label="기록한 날" value={`${logged.length}일`} sub={avgPct === null ? undefined : `평균 ${Math.round(avgPct * 100)}% 먹음`} />
-        <Stat
-          label="이달 체중 변화"
-          value={wChange === null ? '기록 2개 이상 필요' : `${wChange >= 0 ? '+' : ''}${formatNum(wChange, 1)}kg`}
-          tone={wChange === null ? undefined : wChange > 0 ? 'ok' : 'warn'}
-        />
       </Card>
 
       <DayEditor key={sel} data={data} date={sel} intake={intakeOf(sel)} weight={weightOf(sel)} />
@@ -142,7 +131,7 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
           </div>
         </div>
         <Bar value={intake?.kcal ?? 0} max={data.settings.kcalTarget} label="그날 칼로리 목표 대비" />
-        <p className="muted" style={{ margin: 0 }}>{copyMsg ?? '먹은 음식을 눌러 체크하세요. 체크한 것만 계산돼요.'}</p>
+        {copyMsg && <p className="muted" style={{ margin: 0 }}>{copyMsg}</p>}
       </section>
 
       {data.settings.meals.map((meal, i) => (

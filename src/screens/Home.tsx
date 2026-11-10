@@ -9,15 +9,14 @@ import { weeklyReview } from '../domain/checkin';
 import { dayIntake } from '../domain/intake';
 import { logWeight, updateSettings, weeklyCheckin } from '../db/actions';
 import { db } from '../db/db';
-import { forecastDate, goalWeightOn, movingAverage } from '../domain/weight';
+import { movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
 export default function Home({ data, navigate }: { data: AppData; navigate: (s: Screen) => void }) {
-  const { summary: s, nutrition: n, settings, period } = data;
+  const { summary: s, settings, period } = data;
   const avg = movingAverage(data.weights, data.today);
-  const goal = settings.weightGoal;
   const soonLimit = addDays(data.today, 3);
   const tracked = new Set(data.stockEvents.map((e) => e.foodId));
   const planned = data.foods.filter((f) => !f.free && (data.dailyUse[f.id] ?? 0) > 0);
@@ -73,18 +72,15 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
             <>
               <Stat
                 label="칼로리"
-                value={`${formatNum(kcal)} / ${formatNum(settings.kcalTarget)} kcal`}
-                sub={it ? `${Math.round(it.pct * 100)}%` : '아직 체크 안 함'}
+                value={`${formatNum(kcal)} / ${formatNum(it?.target ?? settings.kcalTarget)} kcal`}
                 tone={it ? (it.grade === 'good' ? 'ok' : 'warn') : undefined}
               />
-              <Bar value={kcal} max={settings.kcalTarget} label="오늘 칼로리 목표 대비" />
+              <Bar value={kcal} max={it?.target ?? settings.kcalTarget} label="오늘 칼로리 목표 대비" />
               <Stat
                 label="단백질"
-                value={`${formatNum(protein, 1)} g`}
-                sub={`목표 ${settings.proteinTarget[0]}~${settings.proteinTarget[1]}g`}
+                value={`${formatNum(protein, 0)} / ${settings.proteinTarget.join('~')} g`}
                 tone={it ? (protein >= settings.proteinTarget[0] ? 'ok' : 'warn') : undefined}
               />
-              <p className="muted" style={{ margin: '6px 0 0' }}>계획대로 다 먹으면 {formatNum(n.kcal)}kcal · 단백질 {formatNum(n.protein, 1)}g</p>
             </>
           );
         })()}
@@ -98,18 +94,12 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
         <Stat label="고정·정기" value={formatKRW(s.fixed)} />
         <Stat label={s.foodSpent > s.foodPlan ? '식단 (계획보다 더 삼)' : '식단 계획'} value={formatKRW(Math.max(s.foodPlan, s.foodSpent))} />
         <Stat label="식단 외 지출" value={formatKRW(s.otherSpent)} />
-        <Bar value={s.fixed + Math.max(s.foodPlan, s.foodSpent) + s.otherSpent} max={Math.max(1, s.income)} label="수입 대비 지출" />
       </Card>
 
       <Card title="체중">
         <QuickWeight data={data} />
         <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
         <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
-        {goal && (() => {
-          const f = forecastDate(data.weights, goal, data.today);
-          return f ? <Stat label={`${goal.targetKg}kg 도달 예상`} value={`${Number(f.slice(5, 7))}월 ${Number(f.slice(8))}일쯤`} tone={f <= goal.endDate ? 'ok' : 'warn'} /> : null;
-        })()}
-        {goal && <Stat label="오늘 목표선" value={`${formatNum(goalWeightOn(goal, data.today), 1)} kg`} sub={`최종 ${goal.targetKg}kg`} />}
       </Card>
 
       {soon.length > 0 && (

@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import type { Screen } from '../App';
-import { Card, Field, Stat } from '../components/ui';
+import { Card, Field } from '../components/ui';
 import { deleteExpense, recordExpense, recordPurchase, updateExpense } from '../db/actions';
 import { db } from '../db/db';
 import { dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
@@ -40,14 +40,12 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
     setMonthPick(m === monthStart(data.today) ? null : m);
     setDayPick(null);
   };
-  const noSpendDays = days.filter((d) => spend[d].noSpend).length;
   const monthTotal = days.reduce((t, d) => t + spend[d].total, 0);
 
   const all = data.expenses
     .filter((e) => (dayPick ? e.date === dayPick : e.date.startsWith(month.slice(0, 7))))
     .sort((a, b) => b.date.localeCompare(a.date));
   const shown = all.filter((e) => !query || `${e.memo} ${e.category} ${e.amount}`.includes(query));
-  const s = data.summary;
   const [y, m] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
 
   const favs = frequentExpenses(data.expenses);
@@ -90,8 +88,7 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
       <button className="card hint-card" onClick={() => navigate('chat')}>
         <MessageCircle size={20} aria-hidden />
         <span>
-          <b>Claude 탭에서 말로 기록하세요</b>
-          <small className="muted">"편의점 1,500원", "바나나 1송이 샀어", 영수증 사진도 돼요</small>
+          <b>Claude 탭에서 "편의점 1,500원"처럼 말하면 기록돼요</b>
         </span>
       </button>
 
@@ -113,13 +110,9 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
         </section>
       )}
 
-      <Card title={`예산월 (${data.period.start.slice(5)} ~ ${data.period.end.slice(5)})`}>
-        <Stat label="식단 구매" value={formatKRW(s.foodSpent)} sub={`계획 ${formatKRW(s.foodPlan)}`} />
-        <Stat label="그 외 지출" value={formatKRW(s.otherSpent)} sub={`하루 쓸 수 있는 돈 ${formatKRW(s.dailyAllowance)}`} />
-      </Card>
 
       <Card
-        title={`${y}년 ${m}월 지출`}
+        title={`${m}월 지출 ${formatKRW(monthTotal)}`}
         action={
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn icon" aria-label="이전 달" onClick={() => moveMonth(-1)}><ChevronLeft size={18} aria-hidden /></button>
@@ -150,11 +143,10 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
           })}
         </div>
         <div className="cal-legend muted">
-          <span><i className="dot nospend" />무지출(장보기 빼고)</span>
+          <span><i className="dot nospend" />무지출</span>
           <span><i className="dot big" />큰 지출</span>
           <span>🛒 식단 장보기</span>
         </div>
-        <Stat label="이 달 쓴 돈" value={formatKRW(monthTotal)} sub={`무지출 ${noSpendDays}일`} />
       </Card>
 
       <Card

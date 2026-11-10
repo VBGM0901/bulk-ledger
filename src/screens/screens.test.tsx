@@ -27,7 +27,6 @@ describe('Home', () => {
     expect(screen.getByText('1,200,180원')).toBeInTheDocument();
     expect(screen.getByText('40,006원')).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2,800 kcal/)).toBeInTheDocument();
-    expect(screen.getByText(/계획대로 다 먹으면 2,756kcal/)).toBeInTheDocument();
     expect(screen.getByText(/백업한 지 7일이 넘었어요/)).toBeInTheDocument();
   });
 
@@ -95,7 +94,7 @@ describe('Spend', () => {
   test('chat hint button goes to the Claude tab', () => {
     const nav = vi.fn();
     render(<Spend data={data()} navigate={nav} />);
-    fireEvent.click(screen.getByRole('button', { name: /Claude 탭에서 말로 기록/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Claude 탭에서/ }));
     expect(nav).toHaveBeenCalledWith('chat');
   });
 
@@ -176,7 +175,6 @@ describe('Log (기록 달력)', () => {
     fireEvent.change(screen.getByLabelText('그날 체중(kg)'), { target: { value: '70.3' } });
     fireEvent.click(screen.getByRole('button', { name: '체중 저장' }));
     await waitFor(async () => expect((await db.weights.get(TODAY))?.kg).toBe(70.3));
-    expect(screen.getByText('70.1kg')).toBeInTheDocument();
   });
 
   test('tapping foods checks only those; 전부 and 전부 다 먹음 work', async () => {
@@ -322,7 +320,7 @@ describe('지출 달력', () => {
   test('previous month can be opened to find and delete old entries', () => {
     render(<Spend data={d()} navigate={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: '이전 달' }));
-    expect(screen.getByText('2026년 10월 지출')).toBeInTheDocument();
+    expect(screen.getByText('10월 지출 3,000원')).toBeInTheDocument();
     expect(screen.getByText('지난달 간식')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /2026-10-20 추가식품 3000원 삭제/ })).toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, Home as HomeIcon, Menu, MessageCircle, Salad, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Home as HomeIcon, Menu, MessageCircle, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAppData } from './state/useAppData';
 import Chat from './screens/Chat';
@@ -15,13 +15,12 @@ export type Screen = 'home' | 'diet' | 'log' | 'spend' | 'more' | 'shopping' | '
 
 const TABS: { id: Screen; label: string; Icon: typeof HomeIcon }[] = [
   { id: 'home', label: '홈', Icon: HomeIcon },
-  { id: 'diet', label: '식단', Icon: Salad },
   { id: 'log', label: '기록', Icon: CalendarDays },
   { id: 'spend', label: '지출', Icon: Wallet },
   { id: 'chat', label: 'Claude', Icon: MessageCircle },
   { id: 'more', label: '더보기', Icon: Menu },
 ];
-const SUB: Partial<Record<Screen, string>> = { shopping: '장보기', report: '월별 리포트', settings: '설정' };
+const SUB: Partial<Record<Screen, string>> = { diet: '식단 계획', shopping: '장보기', report: '월별 리포트', settings: '설정' };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
