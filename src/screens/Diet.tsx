@@ -177,9 +177,11 @@ export default function Diet({ data }: { data: AppData }) {
   return (
     <>
       <Card
-        title={`하루 계획 ${formatNum(data.nutrition.kcal)}kcal · 단백질 ${formatNum(data.nutrition.protein, 1)}g`}
+        title="하루 계획"
         action={<button className="btn" onClick={() => setEditMeals(!editMeals)}>{editMeals ? '완료' : '식단 편집'}</button>}
       >
+        <Stat label="칼로리" value={`${formatNum(data.nutrition.kcal)} kcal`} />
+        <Stat label="단백질" value={`${formatNum(data.nutrition.protein, 1)} g`} />
         <p className="muted">목표 {formatNum(data.settings.kcalTarget)}kcal · 단백질 {data.settings.proteinTarget.join('~')}g. 저녁 집밥은 홈에서 원탭으로 골라요.</p>
       </Card>
 

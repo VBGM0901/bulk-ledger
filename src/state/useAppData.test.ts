@@ -16,7 +16,7 @@ test('derives period, plan, summary and nutrition for 2026-11-10', () => {
   expect(d.nutrition.kcal).toBe(2746);
   expect(Math.round(d.measured.pb! * 10) / 10).toBe(14.3);
   expect(d.dailyUse.pb).toBe(48);
-  expect(d.backupStale).toBe(true);
+  expect(d.backupStale).toBe(false); // 설치 직후, 기록 없음
   expect(d.needsSetup).toBe(false);
 });
 
@@ -24,6 +24,12 @@ test('backup within 7 days is not stale; empty budget needs setup', () => {
   const d = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, lastBackupAt: '2026-11-05T00:00:00.000Z' } }), '2026-11-10');
   expect(d.backupStale).toBe(false);
   expect(d.needsSetup).toBe(true);
+});
+
+test('never backed up: warns only 7+ days after the first record', () => {
+  const w = (date: string) => rawFixture({ weights: [{ date, kg: 70 }] });
+  expect(deriveAppData(w('2026-11-09'), '2026-11-10').backupStale).toBe(false);
+  expect(deriveAppData(w('2026-11-01'), '2026-11-10').backupStale).toBe(true);
 });
 
 test('dinner choice of the day changes nutrition', () => {

@@ -46,7 +46,12 @@ export function deriveAppData(raw: RawData, today: ISODate) {
   }
   const shopping = planShopping({ foods, dailyUse, stock });
   const last = settings.lastBackupAt?.slice(0, 10) ?? null;
-  const backupStale = last === null || daysBetween(last, today) > 7;
+  // 백업한 적이 없으면, 앱에 처음 기록한 날부터 7일이 지나야 경고 (설치 직후엔 경고 안 함)
+  const firstRecord = [...raw.weights, ...raw.expenses, ...raw.purchases, ...raw.dinners]
+    .map((r) => r.date)
+    .sort()[0];
+  const since = last ?? firstRecord ?? null;
+  const backupStale = since !== null && daysBetween(since, today) > 7;
   const needsSetup = raw.incomes.length === 0 && raw.recurring.length === 0;
   return {
     today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup,
