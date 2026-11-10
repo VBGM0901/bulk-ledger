@@ -1,6 +1,8 @@
 import { addDays } from './dates';
 import { dailyNutrition } from './nutrition';
-import type { DinnerChoice, DinnerLog, FoodItem, IntakeLog, ISODate, MealStatus, Settings } from './types';
+import type { DinnerChoice, DinnerLog, FoodItem, IntakeLog, ISODate, Meal, MealStatus, Settings } from './types';
+
+export const HOME_KEY = '__home';
 
 export const STATUS_FACTOR: Record<MealStatus, number> = { all: 1, half: 0.5, none: 0 };
 export const STATUS_LABEL: Record<MealStatus, string> = { all: '다 먹음', half: '반쯤', none: '못 먹음' };
@@ -37,15 +39,37 @@ export function dayIntake(
   if (!log) return null;
   const choice: DinnerChoice = dinners.find((d) => d.date === date)?.choice ?? 'meat';
   const n = dailyNutrition(foods, settings.meals, settings.dinner[choice]);
+  const byId = new Map(foods.map((f) => [f.id, f]));
+  const home = settings.dinner[choice];
   let kcal = 0;
   let protein = 0;
   let checked = 0;
   for (const m of n.byMeal) {
+    const items = log.items?.[m.name];
+    if (items) {
+      checked++;
+      for (const [foodId, qty] of Object.entries(items)) {
+        if (foodId === HOME_KEY) {
+          kcal += home.kcal * qty;
+          protein += home.protein * qty;
+          continue;
+        }
+        const f = byId.get(foodId);
+        if (!f) continue;
+        kcal += f.perUnit.kcal * qty;
+        protein += f.perUnit.protein * qty;
+      }
+      continue;
+    }
     const s = log.meals[m.name];
     if (!s) continue;
     checked++;
     kcal += m.kcal * STATUS_FACTOR[s];
     protein += m.protein * STATUS_FACTOR[s];
+  }
+  for (const e of log.extras ?? []) {
+    kcal += e.kcal;
+    protein += e.protein;
   }
   const pct = settings.kcalTarget > 0 ? kcal / settings.kcalTarget : 0;
   return {
@@ -66,4 +90,20 @@ export function recentIntakePct(
     if (d) xs.push(d.pct);
   }
   return xs.length ? { pct: xs.reduce((s, x) => s + x, 0) / xs.length, logged: xs.length } : null;
+}
+
+/** 끼니를 음식별로 처음 펼칠 때 채울 양: 계획량 × 끼니 상태(없으면 다 먹음). 저녁은 집밥 비율 포함. */
+export function initialItems(meal: Meal, status: MealStatus | undefined): Record<string, number> {
+  const f = STATUS_FACTOR[status ?? 'all'];
+  const out: Record<string, number> = {};
+  for (const it of meal.items) out[it.foodId] = (out[it.foodId] ?? 0) + it.qty * f;
+  if (meal.name === '저녁') out[HOME_KEY] = f;
+  return out;
+}
+
+/** 음식별 +/- 한 번에 바뀌는 양 */
+export function stepOf(unit: string, foodId: string): number {
+  if (foodId === HOME_KEY) return 0.5;
+  if (unit === 'g') return foodId === 'pb' ? 8 : 5;
+  return 0.5;
 }

@@ -1,10 +1,10 @@
 import Dexie, { type Table } from 'dexie';
 import type {
-  DinnerLog, Expense, IntakeLog, FinishEvent, FoodItem, Income, PriceHistory, Purchase, RecurringExpense, Settings, StockEvent, WeightLog,
+  ChatMessage, DinnerLog, Expense, IntakeLog, FinishEvent, FoodItem, Income, PriceHistory, Purchase, RecurringExpense, Settings, StockEvent, WeightLog,
 } from '../domain/types';
 
 export const TABLES = [
-  'settings', 'foods', 'incomes', 'recurring', 'expenses', 'purchases', 'stockEvents', 'finishes', 'weights', 'dinners', 'prices', 'intakes',
+  'settings', 'foods', 'incomes', 'recurring', 'expenses', 'purchases', 'stockEvents', 'finishes', 'weights', 'dinners', 'prices', 'intakes', 'chats',
 ] as const;
 export type TableName = (typeof TABLES)[number];
 
@@ -21,6 +21,7 @@ export class AppDB extends Dexie {
   dinners!: Table<DinnerLog, string>;
   prices!: Table<PriceHistory, string>;
   intakes!: Table<IntakeLog, string>;
+  chats!: Table<ChatMessage, string>;
 
   constructor(name = 'bulk-ledger') {
     super(name);
@@ -38,6 +39,7 @@ export class AppDB extends Dexie {
       prices: 'id, foodId',
     });
     this.version(2).stores({ intakes: 'date' });
+    this.version(3).stores({ chats: 'id, at' });
   }
 }
 

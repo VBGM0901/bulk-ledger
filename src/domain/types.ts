@@ -50,8 +50,21 @@ export interface WeightLog { date: ISODate; kg: number }
 export interface DinnerLog { date: ISODate; choice: DinnerChoice }
 /** 끼니별로 얼마나 먹었는지. all=다 먹음, half=반쯤, none=못 먹음 */
 export type MealStatus = 'all' | 'half' | 'none';
-/** 하루 식사 기록. meals의 키는 끼니 이름(아침·점심·저녁…). 체크 안 한 끼니는 키가 없다. */
-export interface IntakeLog { date: ISODate; meals: Record<string, MealStatus> }
+/** Claude 대화방 메시지 (폰에만 저장) */
+export interface ChatMessage { id: string; at: string; role: 'user' | 'assistant'; content: string }
+/** 계획에 없던 음식 (편의점 간식 등). foodId가 있으면 등록된 식품 × qty. */
+export interface IntakeExtra { id: string; name: string; kcal: number; protein: number; foodId?: string; qty?: number }
+/**
+ * 하루 식사 기록. meals의 키는 끼니 이름(아침·점심·저녁…). 체크 안 한 끼니는 키가 없다.
+ * items[끼니][foodId] = 실제 먹은 양 (음식별로 입력한 끼니만). 저녁 집밥은 '__home' 키에 0~1 비율.
+ * 같은 끼니에 items가 있으면 meals 상태보다 items가 우선한다.
+ */
+export interface IntakeLog {
+  date: ISODate;
+  meals: Record<string, MealStatus>;
+  items?: Record<string, Record<string, number>>;
+  extras?: IntakeExtra[];
+}
 export interface PriceHistory { id: string; foodId: string; date: ISODate; packLabel: string; price: number }
 export interface WeightGoal { startKg: number; targetKg: number; startDate: ISODate; endDate: ISODate }
 export interface Settings {

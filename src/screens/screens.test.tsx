@@ -4,6 +4,7 @@ import { db } from '../db/db';
 import { DEFAULT_SETTINGS } from '../domain/defaults';
 import { rawFixture, SAMPLE_BUDGET } from '../state/testData';
 import { deriveAppData } from '../state/useAppData';
+import Chat from './Chat';
 import CaptureFlow from './CaptureFlow';
 import Diet from './Diet';
 import Home from './Home';
@@ -219,5 +220,56 @@ describe('Shopping', () => {
     expect(screen.getByRole('heading', { name: '로켓프레시' })).toBeInTheDocument();
     expect(screen.getByText(/최소 주문 15,000원 충족/)).toBeInTheDocument();
     expect(screen.getByText('283,620원')).toBeInTheDocument();
+  });
+});
+
+describe('Chat (대화방)', () => {
+  test('without API key: asks to set the key, input disabled', () => {
+    render(<Chat data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    expect(screen.getByText(/API 키가 아직 없어요/)).toBeInTheDocument();
+    expect(screen.getByLabelText('메시지')).toBeDisabled();
+  });
+
+  test('sends, saves both messages, and keeps them after re-render', async () => {
+    const f = vi.fn().mockResolvedValue(new Response(JSON.stringify({ content: [{ type: 'text', text: '잘 먹고 있어요' }] }), { status: 200 }));
+    vi.stubGlobal('fetch', f);
+    const data = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, apiKey: 'sk-test' } }), TODAY);
+    const { unmount } = render(<Chat data={data} navigate={() => {}} />);
+    fireEvent.change(screen.getByLabelText('메시지'), { target: { value: '나 잘 먹고 있어?' } });
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+    expect(await screen.findByText('잘 먹고 있어요')).toBeInTheDocument();
+    expect((await db.chats.toArray()).map((m) => m.role)).toEqual(['user', 'assistant']);
+    unmount();
+    render(<Chat data={data} navigate={() => {}} />);
+    expect(await screen.findByText('나 잘 먹고 있어?')).toBeInTheDocument();
+  });
+
+  test('failed call removes the question and puts it back in the input', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 401 })));
+    const data = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, apiKey: 'sk-bad' } }), TODAY);
+    render(<Chat data={data} navigate={() => {}} />);
+    fireEvent.change(screen.getByLabelText('메시지'), { target: { value: '안녕' } });
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(await db.chats.count()).toBe(0);
+    expect(screen.getByLabelText('메시지')).toHaveValue('안녕');
+  });
+});
+
+describe('Log 음식별 체크', () => {
+  test('opening a meal and lowering one food stores per-food amounts', async () => {
+    const data = deriveAppData(rawFixture(), TODAY);
+    render(<Log data={data} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /음식별로 체크/ })[0]); // 아침
+    fireEvent.click(screen.getAllByRole('button', { name: '곰곰 맥반석 구운란 줄이기' })[0]);
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.items?.['아침']).toEqual({ juice: 1, yogurt: 1, egg: 1.5 }));
+  });
+
+  test('adds a custom extra food', async () => {
+    render(<Log data={deriveAppData(rawFixture(), TODAY)} />);
+    fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '삼각김밥' } });
+    fireEvent.change(screen.getByLabelText('칼로리(kcal)'), { target: { value: '200' } });
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.extras?.[0]).toMatchObject({ name: '삼각김밥', kcal: 200, protein: 0 }));
   });
 });

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, Home as HomeIcon, Menu, Salad, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Home as HomeIcon, Menu, MessageCircle, Salad, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAppData } from './state/useAppData';
 import Chat from './screens/Chat';
@@ -18,9 +18,10 @@ const TABS: { id: Screen; label: string; Icon: typeof HomeIcon }[] = [
   { id: 'diet', label: '식단', Icon: Salad },
   { id: 'log', label: '기록', Icon: CalendarDays },
   { id: 'spend', label: '지출', Icon: Wallet },
+  { id: 'chat', label: 'Claude', Icon: MessageCircle },
   { id: 'more', label: '더보기', Icon: Menu },
 ];
-const SUB: Partial<Record<Screen, string>> = { shopping: '장보기', report: '월별 리포트', chat: 'Claude', settings: '설정' };
+const SUB: Partial<Record<Screen, string>> = { shopping: '장보기', report: '월별 리포트', settings: '설정' };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -68,7 +69,7 @@ export default function App() {
             {screen === 'more' && <More navigate={navigate} />}
             {screen === 'shopping' && <Shopping data={data} />}
             {screen === 'report' && <Report data={data} />}
-            {screen === 'chat' && <Chat data={data} />}
+            {screen === 'chat' && <Chat data={data} navigate={navigate} />}
             {screen === 'settings' && <SettingsScreen data={data} />}
           </>
         )}

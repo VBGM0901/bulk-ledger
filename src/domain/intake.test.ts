@@ -37,3 +37,26 @@ test('grades and recent average', () => {
   expect(r.logged).toBe(2);
   expect(recentIntakePct('2026-11-10', 7, DEFAULT_FOODS, DEFAULT_SETTINGS, [], [])).toBeNull();
 });
+
+import { HOME_KEY, initialItems } from './intake';
+
+test('per-food quantities override meal status; dinner home portion uses the dinner preset', () => {
+  const breakfast = DEFAULT_SETTINGS.meals.find((m) => m.name === '아침')!;
+  const items = { ...initialItems(breakfast, 'all'), egg: 1 }; // 계란 2개 → 1개
+  const d = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: {}, items: { 아침: items } }])!;
+  expect(d.kcal).toBe(399 - 72);
+  expect(d.checked).toBe(1);
+  const dinner = DEFAULT_SETTINGS.meals.find((m) => m.name === '저녁')!;
+  expect(initialItems(dinner, 'half')[HOME_KEY]).toBe(0.5);
+  const dn = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: {}, items: { 저녁: { nuts: 0, [HOME_KEY]: 1 } } }])!;
+  expect(dn.kcal).toBe(650);
+});
+
+test('extra foods add to the day', () => {
+  const d = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [
+    { date: '2026-11-10', meals: {}, extras: [{ id: 'x', name: '삼각김밥', kcal: 200, protein: 5 }] },
+  ])!;
+  expect(d.kcal).toBe(200);
+  expect(d.protein).toBe(5);
+  expect(d.checked).toBe(0);
+});

@@ -1,4 +1,4 @@
-import type { DinnerChoice, Expense, FinishEvent, ISODate, MealStatus, PurchaseLine, Settings } from '../domain/types';
+import type { DinnerChoice, Expense, FinishEvent, IntakeExtra, IntakeLog, ISODate, MealStatus, PurchaseLine, Settings } from '../domain/types';
 import type { AppDB } from './db';
 
 export const newId = (): string => crypto.randomUUID();
@@ -68,21 +68,62 @@ export async function setDinner(db: AppDB, date: ISODate, choice: DinnerChoice):
   await db.dinners.put({ date, choice });
 }
 
-/** 하루 끼니 기록. status=null이면 그 끼니 체크를 지운다. */
+/** 하루 끼니 기록. status=null이면 그 끼니 체크를 지운다. 음식별 입력도 함께 초기화된다. */
 export async function setMealStatus(db: AppDB, date: ISODate, meal: string, status: MealStatus | null): Promise<void> {
-  await db.transaction('rw', db.intakes, async () => {
-    const cur = (await db.intakes.get(date))?.meals ?? {};
-    const meals = { ...cur };
-    if (status === null) delete meals[meal];
-    else meals[meal] = status;
-    if (Object.keys(meals).length === 0) await db.intakes.delete(date);
-    else await db.intakes.put({ date, meals });
+  await updateIntake(db, date, (log) => {
+    if (status === null) delete log.meals[meal];
+    else log.meals[meal] = status;
+    if (log.items) delete log.items[meal];
   });
 }
 
-/** 하루 끼니를 한 번에 '다 먹음'으로. */
+/** 하루 끼니를 한 번에 '다 먹음'으로 (추가 음식은 유지). */
 export async function markAllEaten(db: AppDB, date: ISODate, mealNames: string[]): Promise<void> {
-  await db.intakes.put({ date, meals: Object.fromEntries(mealNames.map((m) => [m, 'all' as const])) });
+  await updateIntake(db, date, (log) => {
+    log.meals = Object.fromEntries(mealNames.map((m) => [m, 'all' as const]));
+    delete log.items;
+  });
+}
+
+/**
+ * 끼니 안의 음식 하나의 실제 먹은 양. 그 끼니를 처음 음식별로 바꾸면 initial로 다른 음식 양을 채운다.
+ */
+export async function setItemQty(
+  db: AppDB, date: ISODate, meal: string, foodId: string, qty: number, initial: Record<string, number>,
+): Promise<void> {
+  if (!(qty >= 0) || qty > 10000) throw new Error('양을 확인해 주세요.');
+  await updateIntake(db, date, (log) => {
+    const items = { ...(log.items ?? {}) };
+    items[meal] = { ...(items[meal] ?? initial), [foodId]: Math.round(qty * 100) / 100 };
+    log.items = items;
+    delete log.meals[meal];
+  });
+}
+
+export async function addExtra(db: AppDB, date: ISODate, extra: Omit<IntakeExtra, 'id'>): Promise<void> {
+  if (!extra.name.trim()) throw new Error('음식 이름을 적어 주세요.');
+  if (!(extra.kcal >= 0 && extra.kcal < 5000) || !(extra.protein >= 0 && extra.protein < 300)) throw new Error('칼로리·단백질 값을 확인해 주세요.');
+  await updateIntake(db, date, (log) => {
+    log.extras = [...(log.extras ?? []), { ...extra, name: extra.name.trim(), id: newId() }];
+  });
+}
+
+export async function removeExtra(db: AppDB, date: ISODate, id: string): Promise<void> {
+  await updateIntake(db, date, (log) => {
+    log.extras = (log.extras ?? []).filter((e) => e.id !== id);
+  });
+}
+
+async function updateIntake(db: AppDB, date: ISODate, fn: (log: IntakeLog) => void): Promise<void> {
+  await db.transaction('rw', db.intakes, async () => {
+    const cur = await db.intakes.get(date);
+    const log: IntakeLog = cur ? structuredClone(cur) : { date, meals: {} };
+    fn(log);
+    if (log.items && Object.keys(log.items).length === 0) delete log.items;
+    if (log.extras && log.extras.length === 0) delete log.extras;
+    if (Object.keys(log.meals).length === 0 && !log.items && !log.extras) await db.intakes.delete(date);
+    else await db.intakes.put(log);
+  });
 }
 
 export async function deleteWeight(db: AppDB, date: ISODate): Promise<void> {

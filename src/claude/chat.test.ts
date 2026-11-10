@@ -32,3 +32,14 @@ test('askClaude uses sonnet, sends history, system holds context', async () => {
   expect(body.system).toContain('남은 예산');
   expect(body.system).not.toContain('sk-ant-secret');
 });
+
+test('context includes recent intake and weight records', () => {
+  const d = deriveAppData(rawFixture({
+    weights: [{ date: '2026-11-09', kg: 70.2 }],
+    intakes: [{ date: '2026-11-09', meals: { 아침: 'all' }, extras: [{ id: 'x', name: '삼각김밥', kcal: 200, protein: 5 }] }],
+  }), '2026-11-10');
+  const c = buildChatContext(d);
+  expect(c).toContain('- 2026-11-09: 599kcal');
+  expect(c).toContain('체중 70.2kg');
+  expect(c).toContain('추가: 삼각김밥 200kcal');
+});

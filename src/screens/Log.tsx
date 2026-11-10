@@ -1,23 +1,18 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { Bar, Card, Stat } from '../components/ui';
-import { deleteWeight, logWeight, markAllEaten, setDinner, setMealStatus } from '../db/actions';
+import { deleteWeight, logWeight, markAllEaten } from '../db/actions';
 import { db } from '../db/db';
 import { addDays } from '../domain/dates';
-import { dayIntake, STATUS_LABEL, type DayIntake } from '../domain/intake';
+import { dayIntake, type DayIntake } from '../domain/intake';
 import { formatNum } from '../domain/money';
 import { dailyNutrition } from '../domain/nutrition';
-import type { DinnerChoice, ISODate, MealStatus } from '../domain/types';
+import type { DinnerChoice, ISODate } from '../domain/types';
 import type { AppData } from '../state/useAppData';
+import { ExtraFoods, MealRow } from './LogParts';
 import { WeightTrend } from './Weight';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
-const STATUSES: MealStatus[] = ['all', 'half', 'none'];
-const DINNER: { id: DinnerChoice; label: string }[] = [
-  { id: 'meat', label: '고기 있음' },
-  { id: 'none', label: '고기 없음' },
-  { id: 'less', label: '덜 먹음' },
-];
 const GRADE_LABEL = { good: '잘 먹음', ok: '조금 부족', low: '많이 부족' } as const;
 
 const dow = (d: ISODate) => new Date(`${d}T00:00:00`).getDay();
@@ -136,31 +131,19 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
         />
       )}
 
-      {plan.byMeal.map((m) => {
-        const cur = log?.meals[m.name];
-        return (
-          <div key={m.name} className="meal-check">
-            <div className="row">
-              <strong>{m.name}</strong>
-              <span className="muted">{formatNum(m.kcal)}kcal · P {formatNum(m.protein, 1)}g</span>
-            </div>
-            <div className="seg" role="group" aria-label={`${m.name} 먹은 양`}>
-              {STATUSES.map((s) => (
-                <button key={s} aria-pressed={cur === s} onClick={() => setMealStatus(db, date, m.name, cur === s ? null : s)}>
-                  {STATUS_LABEL[s]}
-                </button>
-              ))}
-            </div>
-            {m.name === '저녁' && (
-              <div className="seg sub" role="group" aria-label="저녁 반찬">
-                {DINNER.map((d) => (
-                  <button key={d.id} aria-pressed={choice === d.id} onClick={() => setDinner(db, date, d.id)}>{d.label}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {data.settings.meals.map((meal) => (
+        <MealRow
+          key={meal.name}
+          data={data}
+          date={date}
+          meal={meal}
+          planKcal={plan.byMeal.find((b) => b.name === meal.name)}
+          log={log}
+          choice={choice}
+        />
+      ))}
+
+      <ExtraFoods data={data} date={date} log={log} />
 
       <div className="row" style={{ marginTop: 12 }}>
         <label className="field" style={{ margin: 0 }}>

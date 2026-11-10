@@ -15,42 +15,21 @@
 .num{font-variant-numeric:tabular-nums;font-weight:700}
 .warn{color:var(--molu-warning)}.err{color:var(--molu-error)}.ok{color:var(--molu-ok)}
 .bar{height:8px;border-radius:99px;background:var(--molu-soft);overflow:hidden;margin:4px 0 8px}.bar>span{display:block;height:100%;background:var(--molu-accent);border-radius:99px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;white-space:nowrap;flex:none;border-radius:8px;border:1px solid var(--molu-line);background:var(--molu-bg);font-weight:700;color:var(--molu-ink)}
-.btn.primary{background:var(--molu-side);color:#fff;border-color:var(--molu-side)}
 .btn:disabled{opacity:.55}
-:root[data-molu-theme="dark"] .btn.primary{background:var(--molu-accent);color:var(--molu-on-accent);border-color:var(--molu-accent)}
 .btn.block{width:100%;justify-content:flex-start;margin-bottom:8px}
 .seg{display:flex;gap:4px;padding:4px;border:1px solid var(--molu-line);border-radius:10px;background:var(--molu-bg)}
 .seg button{flex:1;min-height:40px;border:0;background:transparent;border-radius:7px;font-weight:700;color:var(--molu-muted);font-size:14px}
-.seg button[aria-pressed="true"]{background:var(--molu-selected);color:var(--molu-ink);box-shadow:inset 0 0 0 1px var(--molu-accent)}
 .field{display:grid;gap:4px;margin:0 0 10px}.field>span{font-size:13px;font-weight:700}
 .field input,.field select,.field textarea,.input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--molu-line);border-radius:8px;background:var(--molu-bg);font-size:16px}
 .input.small{width:84px;text-align:right}
 .tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:700;background:var(--molu-soft);color:var(--molu-muted);white-space:nowrap}
-.chat-msg{white-space:pre-wrap;line-height:1.6;padding:10px 12px;border-radius:10px;margin:0 0 8px;font-size:15px}
-.chat-msg.user{background:var(--molu-selected);margin-left:15%}
-.chat-msg.assistant{background:var(--molu-bg);border:1px solid var(--molu-line);margin-right:8%}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;background:var(--molu-bg);border-top:1px solid var(--molu-line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #091b3612}
 .tabbar button{flex:1;display:grid;justify-items:center;gap:2px;min-height:48px;border:0;background:none;font-size:11px;font-weight:700;color:var(--molu-muted)}
 .tabbar button[aria-current="page"]{color:var(--molu-accent)}
 :focus-visible{outline:2px solid var(--molu-focus);outline-offset:2px}
 .row>.field{flex:1 1 0;min-width:0}
 .row>.input{flex:1 1 auto;min-width:0}
-/* 호버·누름 효과 (molu 방식). 마우스: 살짝 떠오름 + 색 / 아이폰 터치: 누를 때 눌림 */
-.btn,.seg button,.tabbar button,button.card,.cal-day{transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s}
-@media(hover:hover) and (pointer:fine){
-  .btn:hover:not(:disabled){background:var(--molu-selected);border-color:var(--molu-accent);color:var(--molu-ink);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
-  .btn.primary:hover:not(:disabled){background:var(--molu-accent);border-color:var(--molu-accent);color:var(--molu-on-accent,#fff)}
-  .seg button:hover:not([aria-pressed="true"]){background:var(--molu-soft);color:var(--molu-ink)}
-  .tabbar button:hover{color:var(--molu-accent)}
-  button.card:hover{border-color:var(--molu-accent);transform:translateY(-2px);box-shadow:0 9px 24px #1f619916}
-  .cal-day:hover:not(:disabled){border-color:var(--molu-accent);transform:translateY(-1px)}
-}
-.btn:active:not(:disabled),.seg button:active,button.card:active,.cal-day:active:not(:disabled){transform:scale(.97)}
-.tabbar button:active{color:var(--molu-accent)}
-@media(prefers-reduced-motion:reduce){.btn,.seg button,button.card,.cal-day{transition:none}.btn:hover,.btn:active,button.card:hover,button.card:active,.cal-day:hover,.cal-day:active{transform:none!important}}
 /* 기록 달력 */
-.btn.icon{min-width:44px;padding:10px}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:4px 0 8px}
 .cal-head{text-align:center;font-size:12px;font-weight:700;color:var(--molu-muted);padding:4px 0}
 .cal-head.sun{color:var(--molu-error)}.cal-head.sat{color:var(--molu-accent)}
@@ -71,3 +50,61 @@
 .meal-check .row{margin-bottom:6px}
 .seg.sub{margin-top:6px}.seg.sub button{min-height:34px;font-size:13px}
 .advice{font-size:17px;margin:2px 0 4px}
+
+/* ── 버튼: molu 형식 (secondary-action / search-submit / official-link / sort-tab / file-selector) ── */
+:root{--btn-line:#9dbbe3;--btn-bg:#f4f8ff;--btn-ink:#1553a9;--btn-hover-bg:#e8f2ff;--btn-hover-line:#7aa9dc;--btn-pressed-bg:#eaf5ff;--btn-pressed-line:#abcbea;--btn-pressed-ink:#123b73;--btn-primary:linear-gradient(135deg,#11234c,#1a376c);--btn-primary-hover:#1a4d94}
+:root[data-molu-theme="dark"]{--btn-line:#3d5578;--btn-bg:#15233e;--btn-ink:#aee9ff;--btn-hover-bg:#1a2e4e;--btn-hover-line:#5f7fa8;--btn-pressed-bg:#2b456b;--btn-pressed-line:#6f93c2;--btn-pressed-ink:#eef5ff;--btn-primary:linear-gradient(135deg,#1d3a6d,#27508f);--btn-primary-hover:#2f5fa6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 17px;white-space:nowrap;flex:none;border-radius:8px;border:1px solid var(--btn-line);background:var(--btn-bg);font-size:15px;font-weight:700;color:var(--btn-ink);letter-spacing:-.01em}
+.btn.primary{border-color:transparent;border-radius:7px;background:var(--btn-primary);color:#fff;font-weight:800}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.block{width:100%;justify-content:flex-start;margin-bottom:8px}
+.btn.icon{min-width:44px;padding:10px}
+.btn.danger{color:var(--molu-error);border-color:color-mix(in srgb,var(--molu-error) 45%,var(--btn-line))}
+.seg button[aria-pressed="true"]{background:var(--btn-pressed-bg);color:var(--btn-pressed-ink);box-shadow:inset 0 0 0 1px var(--btn-pressed-line)}
+/* 파일 선택: molu file-selector 형식 */
+input[type=file]{width:100%;min-height:44px;padding:0;border:1px solid var(--molu-line);border-radius:8px;background:var(--molu-bg);color:var(--molu-muted);font-size:14px;overflow:hidden;cursor:pointer}
+input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;border-right:1px solid var(--molu-line);padding:0 14px;background:var(--molu-selected);color:var(--molu-ink);font:inherit;font-weight:800;cursor:pointer;transition:background .18s}
+/* 호버(마우스) · 누름(아이폰 터치) */
+.btn,.seg button,.tabbar button,button.card,.cal-day{transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s}
+@media(hover:hover) and (pointer:fine){
+  .btn:hover:not(:disabled){background:var(--btn-hover-bg);border-color:var(--btn-hover-line);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
+  .btn.primary:hover:not(:disabled){background:var(--btn-primary-hover);border-color:transparent;color:#fff;transform:translateY(-2px);box-shadow:0 8px 20px #132c5833}
+  .seg button:hover:not([aria-pressed="true"]){background:var(--btn-hover-bg);color:var(--btn-ink)}
+  .tabbar button:hover{color:var(--molu-accent)}
+  button.card:hover{border-color:var(--btn-hover-line);transform:translateY(-2px);box-shadow:0 9px 24px #1f619916}
+  .cal-day:hover:not(:disabled){border-color:var(--btn-hover-line);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
+  input[type=file]:hover::file-selector-button{background:var(--btn-hover-bg)}
+}
+.btn:active:not(:disabled),.seg button:active,button.card:active,.cal-day:active:not(:disabled){transform:scale(.97)}
+.tabbar button:active{color:var(--molu-accent)}
+@media(prefers-reduced-motion:reduce){.btn,.seg button,button.card,.cal-day{transition:none}.btn:hover,.btn:active,button.card:hover,button.card:active,.cal-day:hover,.cal-day:active{transform:none!important}}
+/* 음식별 체크 */
+.link-btn{display:inline-flex;align-items:center;min-height:36px;margin-top:4px;padding:6px 2px;border:0;background:none;color:var(--btn-ink);font-size:13px;font-weight:700}
+@media(hover:hover) and (pointer:fine){.link-btn:hover{text-decoration:underline;text-underline-offset:3px}}
+.food-list{list-style:none;margin:2px 0 8px;padding:0;display:grid;gap:6px}
+.food-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--molu-line);border-radius:8px;background:var(--molu-bg)}
+.food-list li.skipped .food-name{opacity:.5;text-decoration:line-through}
+.food-name{display:grid;gap:2px;min-width:0;font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.food-name small{font-weight:600}
+.stepper{display:flex;align-items:center;gap:6px;flex:none}
+.stepper .btn.icon{min-width:38px;min-height:38px;padding:0;font-size:18px}
+.stepper .num{min-width:46px;text-align:center}
+/* Claude 대화방 */
+.chat{display:flex;flex-direction:column;min-height:calc(100dvh - 160px)}
+.chat-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.chat-top h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.03em}
+.chat-top p{margin:2px 0 0}
+.chat-log{flex:1;display:flex;flex-direction:column;gap:2px;padding-bottom:84px}
+.chat-empty{margin-top:8px}
+.bubble-wrap{display:flex;flex-direction:column;max-width:86%}
+.bubble-wrap.user{align-self:flex-end;align-items:flex-end}
+.bubble-wrap.assistant{align-self:flex-start;align-items:flex-start}
+.chat-msg{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;padding:10px 14px;margin:6px 0 2px;font-size:15px;border-radius:16px}
+.chat-msg.user{background:var(--btn-primary);color:#fff;border-bottom-right-radius:5px;margin-left:0}
+.chat-msg.assistant{background:var(--molu-card);border:1px solid var(--molu-line);color:var(--molu-ink);border-bottom-left-radius:5px;margin-right:0}
+.chat-time{font-size:11px;color:var(--molu-muted);padding:0 4px}
+.typing span{animation:blink 1.2s infinite both}.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.chat-input{position:fixed;left:0;right:0;bottom:calc(61px + env(safe-area-inset-bottom));z-index:15;display:flex;align-items:flex-end;gap:8px;max-width:640px;margin:0 auto;padding:8px 16px;background:var(--molu-bg);border-top:1px solid var(--molu-line)}
+.chat-input textarea{flex:1;min-height:44px;max-height:140px;padding:10px 14px;border:1px solid var(--molu-line);border-radius:22px;background:var(--molu-card);font-size:16px;line-height:1.4;resize:none;field-sizing:content}
+.chat-input .btn.icon{border-radius:50%;width:44px;height:44px;padding:0}

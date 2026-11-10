@@ -1,6 +1,8 @@
 import { describeChoices } from '../domain/optimizer';
 import { formatKRW, formatNum } from '../domain/money';
 import { costEfficiency } from '../domain/nutrition';
+import { addDays } from '../domain/dates';
+import { dayIntake } from '../domain/intake';
 import { movingAverage, weeklyRate } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 import { callClaude, MODELS } from './client';
@@ -38,10 +40,31 @@ export function buildChatContext(d: AppData): string {
     `체중 7일 평균 ${avg === null ? '기록 없음' : `${formatNum(avg, 1)}kg`}, 최근 1주 변화 ${rate === null ? '데이터 부족' : `${formatNum(rate, 2)}kg`}` +
       `${g ? `, 목표 ${g.startKg}→${g.targetKg}kg (${g.startDate}~${g.endDate})` : ''}.`,
     d.settings.profileNote ? `사용자 메모: ${d.settings.profileNote}` : '',
+    `지금 제안: ${d.advice.title}.`,
+    `최근 14일 기록 (날짜: 먹은 kcal/목표 %, 단백질, 체중, 추가 음식):`,
+    recentLog(d) || '- 기록 없음',
     `이번 달 계획 구매 조합: ${plan}.`,
     '식품:',
     foods,
   ].filter(Boolean).join('\n');
+}
+
+function recentLog(d: AppData): string {
+  const lines: string[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const date = addDays(d.today, -i);
+    const it = dayIntake(date, d.foods, d.settings, d.dinners, d.intakes);
+    const w = d.weights.find((x) => x.date === date);
+    if (!it && !w) continue;
+    const extras = d.intakes.find((l) => l.date === date)?.extras ?? [];
+    const parts = [
+      it ? `${formatNum(it.kcal)}kcal(${Math.round(it.pct * 100)}%), P${formatNum(it.protein, 1)}g, 끼니 ${it.checked}/${it.total} 체크` : '식사 기록 없음',
+      w ? `체중 ${formatNum(w.kg, 1)}kg` : '',
+      extras.length ? `추가: ${extras.map((e) => `${e.name} ${e.kcal}kcal`).join(', ')}` : '',
+    ].filter(Boolean);
+    lines.push(`- ${date}: ${parts.join(' · ')}`);
+  }
+  return lines.join('\n');
 }
 
 const SYSTEM = [
