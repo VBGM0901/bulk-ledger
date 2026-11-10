@@ -20,7 +20,7 @@ export interface WeeklyReview {
 
 /**
  * 주간 체크인: 지난 7일을 돌아보고, 제안(+250 / −200 / 유지)을 버튼 한 번으로 정한다.
- * 이번 주에 이미 했거나, 지난 7일에 기록이 하나도 없으면 띄우지 않는다.
+ * 이번 주에 이미 했거나, 지난 7일 기록이 너무 적으면(식사 3일·체중 3번 미만) 띄우지 않는다.
  */
 export function weeklyReview(
   today: ISODate,
@@ -32,7 +32,8 @@ export function weeklyReview(
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, -(i + 1)));
   const logs = days.map((d) => dayIntake(d, foods, s, dinners, intakes)).filter((x) => x !== null);
   const weighIns = weights.filter((w) => days.includes(w.date)).length;
-  if (logs.length === 0 && weighIns === 0) return null;
+  // 판단할 거리가 있을 때만 (식사 기록 3일 또는 체중 3번 이상)
+  if (logs.length < 3 && weighIns < 3) return null;
   const avgPct = logs.length ? logs.reduce((t, x) => t + x.pct, 0) / logs.length : null;
   const delta = advice.kind === 'add' ? 250 : advice.kind === 'too-fast' ? -200 : 0;
   return { week, goodDays: logs.filter((x) => x.grade === 'good').length, loggedDays: logs.length, avgPct, weighIns, delta, done };

@@ -16,16 +16,18 @@ export interface DaySpend {
 
 /**
  * 날짜별 지출. '큰 지출'은 식단 외 지출이 하루 사용 가능 금액의 2배(최소 1만원)를 넘는 날.
- * 오늘 이후 날짜는 무지출로 치지 않는다.
+ * 무지출 도장은 앱을 쓰기 시작한 날(since)부터 오늘까지만 찍는다.
  */
-export function spendByDay(expenses: Expense[], days: ISODate[], today: ISODate, dailyAllowance: number): Record<ISODate, DaySpend> {
+export function spendByDay(
+  expenses: Expense[], days: ISODate[], today: ISODate, dailyAllowance: number, since: ISODate | null = null,
+): Record<ISODate, DaySpend> {
   const bigLine = Math.max(10_000, dailyAllowance * 2);
   const out: Record<ISODate, DaySpend> = {};
   for (const date of days) {
     const list = expenses.filter((e) => e.date === date);
     const food = list.filter((e) => e.category === '식단').reduce((s, e) => s + e.amount, 0);
     const other = list.filter((e) => e.category !== '식단').reduce((s, e) => s + e.amount, 0);
-    out[date] = { date, total: food + other, food, other, big: other > bigLine, noSpend: date <= today && other === 0 };
+    out[date] = { date, total: food + other, food, other, big: other > bigLine, noSpend: date <= today && since !== null && date >= since && other === 0 };
   }
   return out;
 }

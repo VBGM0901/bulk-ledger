@@ -30,7 +30,9 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
   const [dayPick, setDayPick] = useState<string | null>(null);
   const month = monthPick ?? monthStart(data.today);
   const days = monthDays(month);
-  const spend = spendByDay(data.expenses, days, data.today, data.summary.dailyAllowance);
+  // 앱을 쓰기 시작한 날 (첫 기록) — 그 전 날짜엔 무지출 도장을 안 찍는다
+  const since = [...data.expenses, ...data.intakes, ...data.weights, ...data.dinners].map((r) => r.date).sort()[0] ?? null;
+  const spend = spendByDay(data.expenses, days, data.today, data.summary.dailyAllowance, since);
   const isCurrentMonth = month === monthStart(data.today);
   const moveMonth = (n: number) => {
     const m = shiftMonth(month, n);

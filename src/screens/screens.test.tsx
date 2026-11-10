@@ -340,8 +340,8 @@ describe('주간 체크인', () => {
   const all = Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all' as const]));
   const intakes = Array.from({ length: 7 }, (_, i) => ({ date: addDays(TODAY, -(i + 1)), meals: all }));
 
-  test('no records in the last 7 days → no card', () => {
-    render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+  test('too few records in the last 7 days → no card', () => {
+    render(<Home data={deriveAppData(rawFixture({ weights: [{ date: '2026-11-09', kg: 54 }], intakes: intakes.slice(0, 2) }), TODAY)} navigate={() => {}} />);
     expect(screen.queryByRole('region', { name: '주간 체크인' })).toBeNull();
   });
 
