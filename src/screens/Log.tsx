@@ -4,6 +4,7 @@ import { Bar, Card, Stat } from '../components/ui';
 import { copyDayMeals, deleteWeight, logWeight, markAllEaten } from '../db/actions';
 import { db } from '../db/db';
 import { addDays, dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
+import { frequentExtras } from '../domain/favorites';
 import { dayIntake, type DayIntake } from '../domain/intake';
 import { formatNum } from '../domain/money';
 import { dailyNutrition } from '../domain/nutrition';
@@ -148,7 +149,7 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
         <MealChecklist key={meal.name} data={data} date={date} meal={meal} index={i} log={log} choice={choice} />
       ))}
 
-      <ExtraFoods date={date} log={log} />
+      <ExtraFoods date={date} log={log} favs={frequentExtras(data.intakes)} />
 
       <section className="card">
         <div className="row weight-row">

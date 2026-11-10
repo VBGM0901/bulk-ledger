@@ -2,13 +2,14 @@ import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import type { Screen } from '../App';
 import { Card, Field, Stat } from '../components/ui';
-import { deleteExpense, recordExpense, recordPurchase } from '../db/actions';
+import { deleteExpense, recordExpense, recordPurchase, updateExpense } from '../db/actions';
 import { db } from '../db/db';
 import { dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
 import { shortName } from '../domain/display';
+import { frequentExpenses, type FavExpense } from '../domain/favorites';
 import { compactKRW, spendByDay } from '../domain/spending';
 import { formatKRW, parseAmount } from '../domain/money';
-import { EXPENSE_CATEGORIES, type ExpenseCategory, type PurchaseLine } from '../domain/types';
+import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type PurchaseLine } from '../domain/types';
 import type { AppData } from '../state/useAppData';
 
 /** 직접 입력용 카테고리 ('식단'은 식단 구매 기록으로만 생긴다) */
@@ -49,6 +50,13 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
   const s = data.summary;
   const [y, m] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
 
+  const favs = frequentExpenses(data.expenses);
+  const [quick, setQuick] = useState<{ id: string; text: string } | null>(null);
+  async function quickAdd(f: FavExpense) {
+    const id = await recordExpense(db, { date: data.today, amount: f.amount, category: f.category, memo: f.memo, source: 'manual' });
+    setQuick({ id, text: `${f.memo} ${formatKRW(f.amount)} 기록했어요.` });
+  }
+
   async function addManual() {
     try {
       await recordExpense(db, { date, amount: parseAmount(amount) ?? 0, category, memo, source: 'manual' });
@@ -86,6 +94,24 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
           <small className="muted">"편의점 1,500원", "바나나 1송이 샀어", 영수증 사진도 돼요</small>
         </span>
       </button>
+
+      {favs.length > 0 && (
+        <section className="card" aria-label="자주 쓰는 지출">
+          <div className="row"><h2>자주 쓰는 지출</h2><span className="muted">누르면 오늘로 바로 기록</span></div>
+          <div className="fav-chips">
+            {favs.map((f) => (
+              <button key={`${f.memo}|${f.category}|${f.amount}`} className="chip-btn" onClick={() => quickAdd(f)}>
+                {f.memo} <b className="num">{f.amount.toLocaleString('ko-KR')}</b>
+              </button>
+            ))}
+          </div>
+          {quick && (
+            <p className="ok" role="status" style={{ margin: '8px 0 0' }}>
+              {quick.text} <button className="link-btn" onClick={() => { deleteExpense(db, quick.id); setQuick(null); }}>되돌리기</button>
+            </p>
+          )}
+        </section>
+      )}
 
       <Card title={`예산월 (${data.period.start.slice(5)} ~ ${data.period.end.slice(5)})`}>
         <Stat label="식단 구매" value={formatKRW(s.foodSpent)} sub={`계획 ${formatKRW(s.foodPlan)}`} />
@@ -140,24 +166,7 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
         )}
         {shown.length === 0 && <p className="muted">기록이 없어요.</p>}
         {shown.map((e) => (
-          <div key={e.id} className="row expense-row">
-            <span>
-              <b>{e.memo || e.category}</b>
-              <small className="muted">{e.date.slice(5)} · {e.category}</small>
-            </span>
-            <span className="row" style={{ gap: 6 }}>
-              <b className="num">{formatKRW(e.amount)}</b>
-              <button
-                className="btn icon small danger"
-                aria-label={`${e.date} ${e.category} ${e.amount}원 삭제`}
-                onClick={() => {
-                  if (window.confirm(`${formatKRW(e.amount)} 기록을 지울까요?`)) deleteExpense(db, e.id);
-                }}
-              >
-                ×
-              </button>
-            </span>
-          </div>
+          <ExpenseRow key={e.id} e={e} linked={data.purchases.some((p) => p.expenseId === e.id)} today={data.today} />
         ))}
       </Card>
 
@@ -203,5 +212,72 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
         </>
       )}
     </>
+  );
+}
+
+/** 지출 한 줄. 누르면 그 자리에서 고칠 수 있다 (장보기는 금액·메모만). */
+function ExpenseRow({ e, linked, today }: { e: Expense; linked: boolean; today: string }) {
+  const [edit, setEdit] = useState(false);
+  const [amount, setAmount] = useState(String(e.amount));
+  const [memo, setMemo] = useState(e.memo);
+  const [date, setDate] = useState(e.date);
+  const [category, setCategory] = useState<ExpenseCategory>(e.category);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    try {
+      await updateExpense(db, e.id, linked ? { amount: parseAmount(amount) ?? 0, memo } : { amount: parseAmount(amount) ?? 0, memo, date, category });
+      setEdit(false);
+      setErr(null);
+    } catch (x) {
+      setErr((x as Error).message);
+    }
+  }
+
+  if (!edit) {
+    return (
+      <div className="row expense-row">
+        <button className="expense-main" aria-label={`${e.memo || e.category} ${e.amount}원 고치기`} onClick={() => setEdit(true)}>
+          <b>{e.memo || e.category}</b>
+          <small className="muted">{e.date.slice(5)} · {e.category}</small>
+        </button>
+        <span className="row" style={{ gap: 6 }}>
+          <b className="num">{formatKRW(e.amount)}</b>
+          <button
+            className="btn icon small danger"
+            aria-label={`${e.date} ${e.category} ${e.amount}원 삭제`}
+            onClick={() => {
+              if (window.confirm(`${formatKRW(e.amount)} 기록을 지울까요?`)) deleteExpense(db, e.id);
+            }}
+          >
+            ×
+          </button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="expense-edit" aria-label="지출 고치기">
+      <div className="row">
+        <label className="field"><span>금액</span><input inputMode="numeric" value={amount} onChange={(x) => setAmount(x.target.value)} /></label>
+        <label className="field"><span>메모</span><input value={memo} onChange={(x) => setMemo(x.target.value)} /></label>
+      </div>
+      {!linked && (
+        <div className="row">
+          <label className="field"><span>날짜</span><input type="date" value={date} max={today} onChange={(x) => x.target.value && setDate(x.target.value)} /></label>
+          <label className="field"><span>카테고리</span>
+            <select value={category} onChange={(x) => setCategory(x.target.value as ExpenseCategory)}>
+              {CATS.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+      {linked && <p className="muted small-note">식단 장보기는 재고와 연결돼 있어서 금액·메모만 고칠 수 있어요.</p>}
+      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+        <button className="btn" onClick={() => { setEdit(false); setErr(null); }}>취소</button>
+        <button className="btn primary" onClick={save}>저장</button>
+      </div>
+      {err && <p className="err" role="alert">{err}</p>}
+    </div>
   );
 }

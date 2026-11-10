@@ -3,7 +3,7 @@ import type { Screen } from '../App';
 import { Bar, Card, Notice, Stat } from '../components/ui';
 import { depletionDate } from '../domain/consumption';
 import { addDays } from '../domain/dates';
-import { formatKRW, formatNum } from '../domain/money';
+import { formatKRW, formatNum, parseAmount } from '../domain/money';
 import { shortName } from '../domain/display';
 import { weeklyReview } from '../domain/checkin';
 import { dayIntake } from '../domain/intake';
@@ -81,15 +81,15 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
 
       <WeekStamp data={data} onOpen={() => navigate('log')} />
 
-      <Card title="이번 예산월 돈" action={<button className="btn" onClick={() => navigate('spend')}>지출</button>}>
-        <Stat label="수입" value={formatKRW(s.income)} />
+      <Card title="이번 예산월 돈">
+        <SalaryField data={data} />
         <Stat label="고정·정기" value={formatKRW(s.fixed)} sub={pct(s.fixed)} />
         <Stat label="식단 계획" value={formatKRW(s.foodPlan)} sub={`${pct(s.foodPlan) ?? ''} · 실제 구매 ${formatKRW(s.foodSpent)}`} />
         <Stat label="식단 외 지출" value={formatKRW(s.otherSpent)} />
         <Bar value={s.fixed + Math.max(s.foodPlan, s.foodSpent) + s.otherSpent} max={Math.max(1, s.income)} label="수입 대비 지출" />
       </Card>
 
-      <Card title="체중" action={<button className="btn" onClick={() => navigate('log')}>추세</button>}>
+      <Card title="체중">
         <QuickWeight data={data} />
         <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
         <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
@@ -136,7 +136,6 @@ function WeekStamp({ data, onOpen }: { data: AppData; onOpen: () => void }) {
           </span>
         ))}
       </div>
-      <p className="muted stamp-note">동그라미 안 숫자 = 그날 목표 칼로리 중 먹은 %  ·  <b className="ok">초록</b> 95% 이상 · <b className="warn">주황</b> 75% 이상 · <b className="err">빨강</b> 그 아래</p>
     </button>
   );
 }
@@ -186,42 +185,60 @@ function WeeklyCheckin({ data, navigate }: { data: AppData; navigate: (s: Screen
   );
 }
 
-/** 오늘 체중: 마지막 값에서 ±0.1로 맞추고 저장 한 번 */
+/** 오늘 체중: 숫자 입력하고 저장 */
 function QuickWeight({ data }: { data: AppData }) {
   const todayLog = data.weights.find((w) => w.date === data.today);
-  const last = todayLog?.kg ?? data.weights.at(-1)?.kg ?? null;
-  const [draft, setDraft] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
   const [err, setErr] = useState<string | null>(null);
-  const kg = draft ?? last;
-  const step = (d: number) => setDraft(Math.round(((kg ?? 60) + d) * 10) / 10);
   async function save() {
-    if (kg === null) return;
     try {
-      await logWeight(db, data.today, kg);
-      setDraft(null);
+      await logWeight(db, data.today, Number(draft));
+      setDraft('');
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
     }
   }
-  const saved = todayLog && draft === null;
   return (
     <div className="quick-weight">
-      <span className="muted">오늘 아침</span>
-      <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
-        <button className="btn icon" aria-label="0.1kg 내리기" onClick={() => step(-0.1)}>−</button>
+      <span className="muted">오늘 체중{todayLog ? ` · ${formatNum(todayLog.kg, 1)}kg 저장됨` : ''}</span>
+      <form className="row" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); save(); }}>
         <input
           className="input small num"
           inputMode="decimal"
           aria-label="오늘 체중(kg)"
-          value={kg ?? ''}
-          placeholder="kg"
-          onChange={(e) => setDraft(e.target.value === '' ? null : Number(e.target.value))}
+          value={draft}
+          placeholder={String(todayLog?.kg ?? data.weights.at(-1)?.kg ?? 'kg')}
+          onChange={(e) => setDraft(e.target.value)}
         />
-        <button className="btn icon" aria-label="0.1kg 올리기" onClick={() => step(0.1)}>+</button>
-        <button className={`btn ${saved ? '' : 'primary'}`} disabled={kg === null || Boolean(saved)} onClick={save}>{saved ? '저장됨' : '저장'}</button>
-      </div>
+        <button className="btn primary" disabled={!draft.trim()}>저장</button>
+      </form>
       {err && <p className="err" role="alert">{err}</p>}
+    </div>
+  );
+}
+
+/** 월급: 바로 입력 (설정의 첫 번째 수입과 같은 값) */
+function SalaryField({ data }: { data: AppData }) {
+  const salary = data.incomes[0];
+  const others = data.incomes.slice(1).reduce((t, i) => t + (i.amount ?? 0), 0);
+  return (
+    <div className="quick-weight">
+      <span className="muted">월급{others ? ` (그 외 수입 ${formatKRW(others)})` : ''}</span>
+      <input
+        key={`${salary?.id}-${salary?.amount}`}
+        className="input num salary-input"
+        inputMode="numeric"
+        aria-label="월급"
+        defaultValue={salary?.amount ? salary.amount.toLocaleString('ko-KR') : ''}
+        placeholder="월급 입력"
+        onBlur={async (e) => {
+          const v = parseAmount(e.target.value);
+          if (v === null || v === salary?.amount) return;
+          if (salary) await db.incomes.update(salary.id, { amount: v });
+          else await db.incomes.put({ id: 'salary', name: '월급', amount: v });
+        }}
+      />
     </div>
   );
 }

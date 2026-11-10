@@ -372,14 +372,64 @@ describe('주간 체크인', () => {
   });
 });
 
-describe('홈 체중 바로 입력', () => {
-  test('starts from the last weight, +0.1 then 저장 saves today', async () => {
+describe('홈 바로 입력', () => {
+  test('weight: type a number and 저장 saves today', async () => {
     const d = deriveAppData(rawFixture({ weights: [{ date: '2026-11-09', kg: 54 }] }), TODAY);
     render(<Home data={d} navigate={() => {}} />);
-    expect(screen.getByLabelText('오늘 체중(kg)')).toHaveValue('54');
-    fireEvent.click(screen.getByRole('button', { name: '0.1kg 올리기' }));
-    fireEvent.click(screen.getByRole('button', { name: '0.1kg 올리기' }));
+    expect(screen.queryByRole('button', { name: /0.1kg/ })).toBeNull(); // ± 버튼 없음
+    fireEvent.change(screen.getByLabelText('오늘 체중(kg)'), { target: { value: '54.2' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(async () => expect((await db.weights.get(TODAY))?.kg).toBe(54.2));
+  });
+
+  test('salary: typing on home updates the first income (or creates 월급)', async () => {
+    render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    const f = screen.getByLabelText('월급');
+    fireEvent.change(f, { target: { value: '2,100,000' } });
+    fireEvent.blur(f);
+    await waitFor(async () => expect((await db.incomes.toArray())[0]).toMatchObject({ name: '월급', amount: 2_100_000 }));
+  });
+});
+
+describe('고치기 · 자주 쓰는 것', () => {
+  const ex = (id: string, date: string, amount: number, memo: string) => ({ id, date, amount, category: '추가식품' as const, memo, source: 'manual' as const });
+
+  test('frequent expense chip records today with undo', async () => {
+    const d = deriveAppData(rawFixture({ expenses: [ex('a', '2026-11-08', 1500, '삼각김밥'), ex('b', '2026-11-09', 1500, '삼각김밥')] }), TODAY);
+    render(<Spend data={d} navigate={() => {}} />);
+    fireEvent.click(within(screen.getByRole('region', { name: '자주 쓰는 지출' })).getByRole('button', { name: /삼각김밥/ }));
+    await waitFor(async () => expect(await db.expenses.where('date').equals(TODAY).count()).toBe(1));
+    fireEvent.click(await screen.findByRole('button', { name: '되돌리기' }));
+    await waitFor(async () => expect(await db.expenses.where('date').equals(TODAY).count()).toBe(0));
+  });
+
+  test('tapping an expense row edits amount, memo, category', async () => {
+    await db.expenses.put(ex('z', TODAY, 1500, '삼각김밥'));
+    const d = deriveAppData(rawFixture({ expenses: [ex('z', TODAY, 1500, '삼각김밥')] }), TODAY);
+    render(<Spend data={d} navigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: '삼각김밥 1500원 고치기' }));
+    fireEvent.change(screen.getByLabelText('금액'), { target: { value: '1,800' } });
+    fireEvent.change(screen.getByLabelText('카테고리'), { target: { value: '여가' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(async () => expect(await db.expenses.get('z')).toMatchObject({ amount: 1800, category: '여가' }));
+  });
+
+  test('food purchase edit changes amount only and keeps the purchase total in sync', async () => {
+    const { recordPurchase, updateExpense } = await import('../db/actions');
+    const { expenseId } = await recordPurchase(db, { date: TODAY, lines: [{ foodId: 'banana', packLabel: '1송이(≈5개)', packs: 1, qtyAdded: 5, price: 2990 }] });
+    await updateExpense(db, expenseId, { amount: 3500, date: '2026-11-01' });
+    expect(await db.expenses.get(expenseId)).toMatchObject({ amount: 3500, date: TODAY });
+    expect((await db.purchases.toArray())[0].total).toBe(3500);
+  });
+
+  test('extra food: frequent chip adds, row tap edits', async () => {
+    const past = ['2026-11-07', '2026-11-08'].map((date, i) => ({ date, meals: {}, extras: [{ id: `p${i}`, name: '라면', kcal: 500, protein: 10 }] }));
+    render(<Log data={deriveAppData(rawFixture({ intakes: past }), TODAY)} />);
+    fireEvent.click(within(screen.getByRole('region', { name: '추가로 먹은 것' })).getByRole('button', { name: /라면/ }));
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.extras?.[0]).toMatchObject({ name: '라면', kcal: 500 }));
+    const { updateExtra } = await import('../db/actions');
+    const id = (await db.intakes.get(TODAY))!.extras![0].id;
+    await updateExtra(db, TODAY, id, { kcal: 550 });
+    expect((await db.intakes.get(TODAY))!.extras![0].kcal).toBe(550);
   });
 });

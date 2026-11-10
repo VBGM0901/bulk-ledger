@@ -53,6 +53,41 @@ export async function deleteExpense(db: AppDB, expenseId: string): Promise<void>
   });
 }
 
+/**
+ * 지출 고치기. 식단 장보기(재고와 연결된 것)는 금액·메모만 바꾼다 — 날짜·종류를 바꾸면 재고 기록과 어긋나므로.
+ */
+export async function updateExpense(
+  db: AppDB, id: string, patch: { amount?: number; memo?: string; date?: ISODate; category?: Expense['category'] },
+): Promise<void> {
+  if (patch.amount !== undefined && !(Number.isInteger(patch.amount) && patch.amount > 0)) throw new Error('금액은 1원 이상 정수여야 해요.');
+  await db.transaction('rw', db.expenses, db.purchases, async () => {
+    const cur = await db.expenses.get(id);
+    if (!cur) throw new Error('이미 지워진 기록이에요.');
+    const linked = await db.purchases.filter((x) => x.expenseId === id).first();
+    const next = { ...cur, amount: patch.amount ?? cur.amount, memo: patch.memo ?? cur.memo };
+    if (!linked) {
+      if (patch.date) next.date = patch.date;
+      if (patch.category) {
+        if (patch.category === '식단') throw new Error('식단 장보기는 식단 구매로 기록해 주세요.');
+        next.category = patch.category;
+      }
+    }
+    await db.expenses.put(next);
+    if (linked && patch.amount !== undefined) await db.purchases.put({ ...linked, total: patch.amount });
+  });
+}
+
+/** 추가로 먹은 음식 고치기 */
+export async function updateExtra(db: AppDB, date: ISODate, id: string, patch: { name?: string; kcal?: number; protein?: number }): Promise<void> {
+  if (patch.name !== undefined && !patch.name.trim()) throw new Error('음식 이름을 적어 주세요.');
+  if ((patch.kcal !== undefined && !(patch.kcal >= 0 && patch.kcal < 5000)) || (patch.protein !== undefined && !(patch.protein >= 0 && patch.protein < 300))) {
+    throw new Error('칼로리·단백질 값을 확인해 주세요.');
+  }
+  await updateIntake(db, date, (log) => {
+    log.extras = (log.extras ?? []).map((x) => (x.id === id ? { ...x, ...patch, name: (patch.name ?? x.name).trim() } : x));
+  });
+}
+
 export async function recordFinish(db: AppDB, f: Omit<FinishEvent, 'id'>): Promise<void> {
   if (f.endDate < f.startDate) throw new Error('다 먹은 날이 시작일보다 빨라요.');
   if (!(f.qty > 0)) throw new Error('먹은 양을 확인해 주세요.');

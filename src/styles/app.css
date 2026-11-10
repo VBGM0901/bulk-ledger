@@ -63,12 +63,12 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 /* 호버(마우스) · 누름(아이폰 터치) */
 .btn,.seg button,.tabbar button,button.card,.cal-day{transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s}
 @media(hover:hover) and (pointer:fine){
-  .btn:hover:not(:disabled){background:var(--btn-hover-bg);border-color:var(--btn-hover-line);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
-  .btn.primary:hover:not(:disabled){background:var(--btn-primary-hover);border-color:transparent;color:#fff;transform:translateY(-2px);box-shadow:0 8px 20px #132c5833}
+  .btn:hover:not(:disabled){background:var(--btn-hover-bg);border-color:var(--btn-hover-line);box-shadow:0 4px 12px #1635631c}
+  .btn.primary:hover:not(:disabled){background:var(--btn-primary-hover);border-color:transparent;color:#fff;box-shadow:0 8px 20px #132c5833}
   .seg button:hover:not([aria-pressed="true"]){background:var(--btn-hover-bg);color:var(--btn-ink)}
   .tabbar button:hover{color:var(--molu-accent)}
-  button.card:hover{border-color:var(--btn-hover-line);transform:translateY(-2px);box-shadow:0 9px 24px #1f619916}
-  .cal-day:hover:not(:disabled){border-color:var(--btn-hover-line);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
+  button.card:hover{border-color:var(--btn-hover-line);box-shadow:0 9px 24px #1f619916}
+  .cal-day:hover:not(:disabled){border-color:var(--btn-hover-line);box-shadow:0 4px 12px #1635631c}
   input[type=file]:hover::file-selector-button{background:var(--btn-hover-bg)}
 }
 .btn:active:not(:disabled),.seg button:active,button.card:active,.cal-day:active:not(:disabled){transform:scale(.97)}
@@ -138,7 +138,7 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .weight-row{align-items:flex-end}
 .weight-row>.btn{flex:none}
 .chip,.check{transition:background .18s,border-color .18s,transform .18s,box-shadow .18s}
-@media(hover:hover) and (pointer:fine){.check:hover{border-color:var(--c);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}.chip:hover{background:color-mix(in srgb,var(--c) 15%,transparent)}.chip.on:hover{background:var(--c)}}
+@media(hover:hover) and (pointer:fine){.check:hover{border-color:var(--c);box-shadow:0 4px 12px #1635631c}.chip:hover{background:color-mix(in srgb,var(--c) 15%,transparent)}.chip.on:hover{background:var(--c)}}
 .check:active,.chip:active{transform:scale(.97)}
 .plan-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 .plan-list li{display:grid;grid-template-columns:1fr auto 64px;align-items:baseline;gap:8px;padding:6px 0;border-top:1px dashed var(--molu-line);font-size:14px;font-weight:700}
@@ -184,3 +184,12 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 @media(max-width:360px){.stamp i{width:34px;height:34px;font-size:10px}}
 .quick-weight{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--molu-line);flex-wrap:wrap}
 .quick-weight .input.small{width:72px;text-align:center;font-size:17px}
+/* 자주 쓰는 것 · 고치기 */
+.fav-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 12px;border-radius:99px;border:1px solid var(--btn-line);background:var(--btn-bg);color:var(--molu-ink);font-size:14px;font-weight:700;transition:background .18s,border-color .18s,transform .18s}
+.chip-btn b{color:var(--btn-ink)}
+@media(hover:hover) and (pointer:fine){.chip-btn:hover{background:var(--btn-hover-bg);border-color:var(--btn-hover-line)}}
+.chip-btn:active{transform:scale(.97)}
+.expense-main{display:grid;gap:1px;text-align:left;border:0;background:none;padding:0;color:var(--molu-ink);min-width:0;flex:1}
+.expense-edit{padding:8px 0;border-top:1px solid var(--molu-line)}
+.salary-input{width:150px;text-align:right;font-size:17px}

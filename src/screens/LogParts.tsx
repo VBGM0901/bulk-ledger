@@ -1,12 +1,13 @@
 import { Check, Plus, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
-import { addExtra, removeExtra, setDinner, setItemQty, setMealStatus } from '../db/actions';
+import { addExtra, removeExtra, setDinner, setItemQty, setMealStatus, updateExtra } from '../db/actions';
 import { db } from '../db/db';
 import { DINNER_OPTIONS, mealColor, shortName } from '../domain/display';
 import { HOME_KEY, initialItems } from '../domain/intake';
 import { formatNum } from '../domain/money';
-import type { DinnerChoice, IntakeLog, ISODate, Meal } from '../domain/types';
+import type { FavExtra } from '../domain/favorites';
+import type { DinnerChoice, IntakeExtra, IntakeLog, ISODate, Meal } from '../domain/types';
 import type { AppData } from '../state/useAppData';
 
 const DINNER = DINNER_OPTIONS;
@@ -103,7 +104,7 @@ export function MealChecklist({ data, date, meal, index, log, choice }: {
 }
 
 /** 계획에 없던 음식 (편의점 간식, 외식 등). 평소엔 접혀 있다. */
-export function ExtraFoods({ date, log }: { date: ISODate; log?: IntakeLog }) {
+export function ExtraFoods({ date, log, favs = [] }: { date: ISODate; log?: IntakeLog; favs?: FavExtra[] }) {
   const extras = log?.extras ?? [];
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -136,13 +137,17 @@ export function ExtraFoods({ date, log }: { date: ISODate; log?: IntakeLog }) {
           <Plus size={14} aria-hidden /> 추가
         </button>
       </header>
-      {extras.length === 0 && !open && <p className="muted" style={{ margin: '2px 0 0' }}>계획에 없던 음식은 Claude 탭에서 말하거나 + 추가로 넣어요.</p>}
-      {extras.map((e) => (
-        <div key={e.id} className="extra-row">
-          <span><b>{e.name}</b> <small className="muted">{formatNum(e.kcal)}kcal · P {formatNum(e.protein, 1)}g</small></span>
-          <button className="btn icon small danger" aria-label={`${e.name} 지우기`} onClick={() => removeExtra(db, date, e.id)}><X size={14} aria-hidden /></button>
+      {extras.length === 0 && !open && favs.length === 0 && <p className="muted" style={{ margin: '2px 0 0' }}>계획에 없던 음식은 Claude 탭에서 말하거나 + 추가로 넣어요.</p>}
+      {extras.map((e) => <ExtraRow key={e.id} date={date} x={e} />)}
+      {favs.length > 0 && (
+        <div className="fav-chips" aria-label="자주 먹은 것">
+          {favs.map((f) => (
+            <button key={`${f.name}|${f.kcal}`} className="chip-btn" onClick={() => addExtra(db, date, { name: f.name, kcal: f.kcal, protein: f.protein })}>
+              <Plus size={13} aria-hidden /> {f.name} <b className="num">{f.kcal}</b>
+            </button>
+          ))}
         </div>
-      ))}
+      )}
       {open && (
         <div className="extra-form">
           <label className="field"><span>음식 이름</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 편의점 삼각김밥" /></label>
@@ -155,5 +160,47 @@ export function ExtraFoods({ date, log }: { date: ISODate; log?: IntakeLog }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** 추가 음식 한 줄. 누르면 이름·칼로리·단백질을 고칠 수 있다. */
+function ExtraRow({ date, x }: { date: ISODate; x: IntakeExtra }) {
+  const [edit, setEdit] = useState(false);
+  const [name, setName] = useState(x.name);
+  const [kcal, setKcal] = useState(String(x.kcal));
+  const [protein, setProtein] = useState(String(x.protein));
+  const [err, setErr] = useState<string | null>(null);
+  if (!edit) {
+    return (
+      <div className="extra-row">
+        <button className="expense-main" aria-label={`${x.name} 고치기`} onClick={() => setEdit(true)}>
+          <span><b>{x.name}</b> <small className="muted">{formatNum(x.kcal)}kcal · P {formatNum(x.protein, 1)}g</small></span>
+        </button>
+        <button className="btn icon small danger" aria-label={`${x.name} 지우기`} onClick={() => removeExtra(db, date, x.id)}><X size={14} aria-hidden /></button>
+      </div>
+    );
+  }
+  async function save() {
+    try {
+      await updateExtra(db, date, x.id, { name, kcal: Number(kcal), protein: Number(protein || 0) });
+      setEdit(false);
+      setErr(null);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+  return (
+    <div className="expense-edit" aria-label={`${x.name} 고치기`}>
+      <label className="field"><span>음식 이름</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <div className="row">
+        <label className="field"><span>칼로리(kcal)</span><input inputMode="numeric" value={kcal} onChange={(e) => setKcal(e.target.value)} /></label>
+        <label className="field"><span>단백질(g)</span><input inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} /></label>
+      </div>
+      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+        <button className="btn" onClick={() => setEdit(false)}>취소</button>
+        <button className="btn primary" onClick={save}>저장</button>
+      </div>
+      {err && <p className="err" role="alert">{err}</p>}
+    </div>
   );
 }
