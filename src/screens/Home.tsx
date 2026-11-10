@@ -67,6 +67,12 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
           sub={`목표 ${settings.proteinTarget[0]}~${settings.proteinTarget[1]}g`}
           tone={n.protein >= settings.proteinTarget[0] ? 'ok' : 'warn'}
         />
+        <Stat
+          label="실제로 먹은 것"
+          value={data.todayIntake ? `${formatNum(data.todayIntake.kcal)} kcal (${Math.round(data.todayIntake.pct * 100)}%)` : '아직 체크 안 함'}
+          tone={data.todayIntake ? (data.todayIntake.grade === 'good' ? 'ok' : 'warn') : undefined}
+        />
+        <button className="btn block" style={{ marginTop: 6 }} onClick={() => navigate('log')}>오늘 먹은 것 체크하기</button>
         <p className="muted" style={{ margin: '10px 0 6px' }}>오늘 저녁</p>
         <div className="seg">
           {DINNER.map((d) => (
@@ -85,8 +91,9 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
         <Bar value={s.fixed + s.foodPlan + s.otherSpent} max={Math.max(1, s.income)} label="수입 대비 지출" />
       </Card>
 
-      <Card title="체중" action={<button className="btn" onClick={() => navigate('weight')}>기록</button>}>
+      <Card title="체중" action={<button className="btn" onClick={() => navigate('log')}>기록</button>}>
         <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
+        <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
         {goal && <Stat label="오늘 목표선" value={`${formatNum(goalWeightOn(goal, data.today), 1)} kg`} sub={`최종 ${goal.targetKg}kg`} />}
       </Card>
 

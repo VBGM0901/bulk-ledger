@@ -48,6 +48,10 @@ export interface StockEvent { id: string; foodId: string; date: ISODate; type: '
 export interface FinishEvent { id: string; foodId: string; startDate: ISODate; endDate: ISODate; qty: number }
 export interface WeightLog { date: ISODate; kg: number }
 export interface DinnerLog { date: ISODate; choice: DinnerChoice }
+/** 끼니별로 얼마나 먹었는지. all=다 먹음, half=반쯤, none=못 먹음 */
+export type MealStatus = 'all' | 'half' | 'none';
+/** 하루 식사 기록. meals의 키는 끼니 이름(아침·점심·저녁…). 체크 안 한 끼니는 키가 없다. */
+export interface IntakeLog { date: ISODate; meals: Record<string, MealStatus> }
 export interface PriceHistory { id: string; foodId: string; date: ISODate; packLabel: string; price: number }
 export interface WeightGoal { startKg: number; targetKg: number; startDate: ISODate; endDate: ISODate }
 export interface Settings {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ensureDefaults } from '../db/backup';
 import { db } from '../db/db';
 import { DEFAULT_SETTINGS } from '../domain/defaults';
@@ -10,7 +10,7 @@ import Home from './Home';
 import Settings from './Settings';
 import Shopping from './Shopping';
 import Spend from './Spend';
-import Weight from './Weight';
+import Log from './Log';
 
 const TODAY = '2026-11-10';
 beforeEach(async () => {
@@ -179,21 +179,37 @@ describe('Settings', () => {
   });
 });
 
-describe('Weight', () => {
+describe('Log (기록 달력)', () => {
   const data = deriveAppData(rawFixture({
     settings: { ...DEFAULT_SETTINGS, weightGoal: { startKg: 70, targetKg: 76, startDate: '2026-11-09', endDate: '2027-02-09' } },
     weights: [{ date: '2026-11-09', kg: 70 }],
   }), TODAY);
 
-  test('logs today weight and rejects nonsense', async () => {
-    render(<Weight data={data} />);
-    fireEvent.change(screen.getByLabelText('오늘 체중(kg)'), { target: { value: '5' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  test('shows month, logs weight for the selected day and rejects nonsense', async () => {
+    render(<Log data={data} />);
+    expect(screen.getByText('2026년 11월')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^11일/ })).toBeDisabled(); // 미래
+    fireEvent.change(screen.getByLabelText('그날 체중(kg)'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: '체중 저장' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('체중 값을 확인해 주세요.');
-    fireEvent.change(screen.getByLabelText('오늘 체중(kg)'), { target: { value: '70.3' } });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.change(screen.getByLabelText('그날 체중(kg)'), { target: { value: '70.3' } });
+    fireEvent.click(screen.getByRole('button', { name: '체중 저장' }));
     await waitFor(async () => expect((await db.weights.get(TODAY))?.kg).toBe(70.3));
     expect(screen.getByText(/목표선 70.1kg/)).toBeInTheDocument();
+  });
+
+  test('meal check buttons and "전부 다 먹음" write the intake log', async () => {
+    render(<Log data={data} />);
+    fireEvent.click(within(screen.getByRole('group', { name: '아침 먹은 양' })).getByRole('button', { name: '반쯤' }));
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.meals['아침']).toBe('half'));
+    fireEvent.click(screen.getByRole('button', { name: '전부 다 먹음' }));
+    await waitFor(async () => expect(Object.values((await db.intakes.get(TODAY))?.meals ?? {})).toEqual(DEFAULT_SETTINGS.meals.map(() => 'all')));
+  });
+
+  test('a logged day shows its percent on the calendar', () => {
+    const d = deriveAppData(rawFixture({ intakes: [{ date: '2026-11-09', meals: Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all'])) }] }), TODAY);
+    render(<Log data={d} />);
+    expect(screen.getByRole('button', { name: /^9일 식사 98% 잘 먹음/ })).toBeInTheDocument();
   });
 });
 

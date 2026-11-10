@@ -14,6 +14,7 @@ export function rawFixture(patch: Partial<RawData> = {}): RawData {
     weights: [],
     dinners: [],
     finishes: [],
+    intakes: [],
     ...patch,
   };
 }

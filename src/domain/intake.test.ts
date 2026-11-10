@@ -1,0 +1,39 @@
+import { DEFAULT_FOODS, DEFAULT_SETTINGS } from './defaults';
+import { dayIntake, gradeOf, recentIntakePct } from './intake';
+
+const names = DEFAULT_SETTINGS.meals.map((m) => m.name);
+const all = Object.fromEntries(names.map((n) => [n, 'all' as const]));
+
+test('no log → null; all eaten → plan kcal', () => {
+  expect(dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [])).toBeNull();
+  const d = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: all }])!;
+  expect(d.kcal).toBe(2746);
+  expect(d.checked).toBe(names.length);
+  expect(d.grade).toBe('good'); // 2746/2800 = 98%
+});
+
+test('half and none reduce intake; unchecked meals count as 0', () => {
+  const half = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: { ...all, 아침: 'half', 점심: 'none' } }])!;
+  const full = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: all }])!;
+  expect(half.kcal).toBeLessThan(full.kcal);
+  const one = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: { 아침: 'all' } }])!;
+  expect(one.checked).toBe(1);
+  expect(one.grade).toBe('low');
+});
+
+test('dinner choice of that day is used', () => {
+  const meat = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: { 저녁: 'all' } }])!;
+  const less = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [{ date: '2026-11-10', choice: 'less' }], [{ date: '2026-11-10', meals: { 저녁: 'all' } }])!;
+  expect(meat.kcal - less.kcal).toBe(250);
+});
+
+test('grades and recent average', () => {
+  expect(gradeOf(0.96)).toBe('good');
+  expect(gradeOf(0.8)).toBe('ok');
+  expect(gradeOf(0.5)).toBe('low');
+  const r = recentIntakePct('2026-11-10', 7, DEFAULT_FOODS, DEFAULT_SETTINGS, [], [
+    { date: '2026-11-10', meals: all }, { date: '2026-11-08', meals: {} }, { date: '2026-11-01', meals: all },
+  ])!;
+  expect(r.logged).toBe(2);
+  expect(recentIntakePct('2026-11-10', 7, DEFAULT_FOODS, DEFAULT_SETTINGS, [], [])).toBeNull();
+});

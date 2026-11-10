@@ -22,3 +22,20 @@ test('weekly rate compares averages one week apart', () => {
   expect(weeklyRate(logs, '2026-11-16')).toBeCloseTo(70.5 - (69.6 + 70.0 + 70.0) / 3, 5);
   expect(weeklyRate(logs.slice(-1), '2026-11-16')).toBeNull();
 });
+
+import { bulkAdvice } from './weight';
+const goal = { startKg: 70, targetKg: 76, startDate: '2026-11-01', endDate: '2027-02-01' }; // 주 ~0.46kg
+const flat = Array.from({ length: 14 }, (_, i) => ({ date: `2026-11-${String(i + 1).padStart(2, '0')}`, kg: 70 }));
+const rising = (perWeek: number) => flat.map((l, i) => ({ ...l, kg: 70 + (perWeek / 7) * i }));
+
+test('bulk advice: data, eat plan first, add, on track, too fast', () => {
+  expect(bulkAdvice([], goal, '2026-11-14', null).kind).toBe('need-data');
+  expect(bulkAdvice(flat, goal, '2026-11-14', 0.7).kind).toBe('eat-plan');
+  const add = bulkAdvice(flat, goal, '2026-11-14', 0.98);
+  expect(add.kind).toBe('add');
+  expect(add.kcalDelta).toBe(250);
+  expect(bulkAdvice(flat, goal, '2026-11-14', null).kind).toBe('add');
+  expect(bulkAdvice(rising(0.45), goal, '2026-11-14', 1).kind).toBe('on-track');
+  expect(bulkAdvice(rising(1.2), goal, '2026-11-14', 1).kind).toBe('too-fast');
+  expect(bulkAdvice(flat, goal, '2026-11-14', null).targetRate).toBeCloseTo(6 / (92 / 7), 3);
+});

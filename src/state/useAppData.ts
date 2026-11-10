@@ -7,9 +7,11 @@ import { estimateStock, measuredDailyUse } from '../domain/consumption';
 import { budgetPeriod, daysBetween, todayISO } from '../domain/dates';
 import { dailyQtyByFood, planFoodPurchases } from '../domain/foodPlan';
 import { dailyNutrition } from '../domain/nutrition';
+import { dayIntake, recentIntakePct } from '../domain/intake';
+import { bulkAdvice } from '../domain/weight';
 import { planShopping } from '../domain/shopping';
 import type {
-  DinnerChoice, DinnerLog, Expense, FinishEvent, FoodItem, ISODate, Income, Purchase, RecurringExpense, Settings, StockEvent, WeightLog,
+  DinnerChoice, DinnerLog, Expense, FinishEvent, FoodItem, IntakeLog, ISODate, Income, Purchase, RecurringExpense, Settings, StockEvent, WeightLog,
 } from '../domain/types';
 
 export interface RawData {
@@ -23,6 +25,7 @@ export interface RawData {
   weights: WeightLog[];
   dinners: DinnerLog[];
   finishes: FinishEvent[];
+  intakes: IntakeLog[];
 }
 
 /** 모든 화면이 쓰는 파생 값. 순수 함수라 테스트 가능. */
@@ -47,14 +50,17 @@ export function deriveAppData(raw: RawData, today: ISODate) {
   const shopping = planShopping({ foods, dailyUse, stock });
   const last = settings.lastBackupAt?.slice(0, 10) ?? null;
   // 백업한 적이 없으면, 앱에 처음 기록한 날부터 7일이 지나야 경고 (설치 직후엔 경고 안 함)
-  const firstRecord = [...raw.weights, ...raw.expenses, ...raw.purchases, ...raw.dinners]
+  const firstRecord = [...raw.weights, ...raw.expenses, ...raw.purchases, ...raw.dinners, ...raw.intakes]
     .map((r) => r.date)
     .sort()[0];
   const since = last ?? firstRecord ?? null;
   const backupStale = since !== null && daysBetween(since, today) > 7;
+  const todayIntake = dayIntake(today, foods, settings, raw.dinners, raw.intakes);
+  const recentIntake = recentIntakePct(today, 7, foods, settings, raw.dinners, raw.intakes);
+  const advice = bulkAdvice(raw.weights, settings.weightGoal, today, recentIntake?.pct ?? null);
   const needsSetup = raw.incomes.length === 0 && raw.recurring.length === 0;
   return {
-    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup,
+    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup, todayIntake, recentIntake, advice,
   };
 }
 export type AppData = ReturnType<typeof deriveAppData>;
@@ -77,11 +83,11 @@ export function useAppData(): AppData | null {
     if (!ready) return null;
     const settings = await db.settings.get('settings');
     if (!settings) return null;
-    const [foods, incomes, recurring, expenses, purchases, stockEvents, weights, dinners, finishes] = await Promise.all([
+    const [foods, incomes, recurring, expenses, purchases, stockEvents, weights, dinners, finishes, intakes] = await Promise.all([
       db.foods.toArray(), db.incomes.toArray(), db.recurring.toArray(), db.expenses.toArray(), db.purchases.toArray(),
-      db.stockEvents.toArray(), db.weights.orderBy('date').toArray(), db.dinners.toArray(), db.finishes.toArray(),
+      db.stockEvents.toArray(), db.weights.orderBy('date').toArray(), db.dinners.toArray(), db.finishes.toArray(), db.intakes.toArray(),
     ]);
-    return { settings, foods, incomes, recurring, expenses, purchases, stockEvents, weights, dinners, finishes };
+    return { settings, foods, incomes, recurring, expenses, purchases, stockEvents, weights, dinners, finishes, intakes };
   }, [ready]);
   if (!ready || !raw) return null;
   return deriveAppData(raw, today);

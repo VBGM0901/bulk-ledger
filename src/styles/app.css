@@ -36,3 +36,38 @@
 :focus-visible{outline:2px solid var(--molu-focus);outline-offset:2px}
 .row>.field{flex:1 1 0;min-width:0}
 .row>.input{flex:1 1 auto;min-width:0}
+/* 호버·누름 효과 (molu 방식). 마우스: 살짝 떠오름 + 색 / 아이폰 터치: 누를 때 눌림 */
+.btn,.seg button,.tabbar button,button.card,.cal-day{transition:background .18s,border-color .18s,color .18s,transform .18s,box-shadow .18s}
+@media(hover:hover) and (pointer:fine){
+  .btn:hover:not(:disabled){background:var(--molu-selected);border-color:var(--molu-accent);color:var(--molu-ink);transform:translateY(-1px);box-shadow:0 4px 12px #1635631c}
+  .btn.primary:hover:not(:disabled){background:var(--molu-accent);border-color:var(--molu-accent);color:var(--molu-on-accent,#fff)}
+  .seg button:hover:not([aria-pressed="true"]){background:var(--molu-soft);color:var(--molu-ink)}
+  .tabbar button:hover{color:var(--molu-accent)}
+  button.card:hover{border-color:var(--molu-accent);transform:translateY(-2px);box-shadow:0 9px 24px #1f619916}
+  .cal-day:hover:not(:disabled){border-color:var(--molu-accent);transform:translateY(-1px)}
+}
+.btn:active:not(:disabled),.seg button:active,button.card:active,.cal-day:active:not(:disabled){transform:scale(.97)}
+.tabbar button:active{color:var(--molu-accent)}
+@media(prefers-reduced-motion:reduce){.btn,.seg button,button.card,.cal-day{transition:none}.btn:hover,.btn:active,button.card:hover,button.card:active,.cal-day:hover,.cal-day:active{transform:none!important}}
+/* 기록 달력 */
+.btn.icon{min-width:44px;padding:10px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:4px 0 8px}
+.cal-head{text-align:center;font-size:12px;font-weight:700;color:var(--molu-muted);padding:4px 0}
+.cal-head.sun{color:var(--molu-error)}.cal-head.sat{color:var(--molu-accent)}
+.cal-day{display:grid;grid-template-rows:auto auto auto;justify-items:center;align-content:start;gap:1px;min-height:58px;padding:5px 2px;border:1px solid var(--molu-line);border-radius:8px;background:var(--molu-bg);color:var(--molu-ink)}
+.cal-day:disabled{opacity:.35;cursor:default}
+.cal-day.today .cal-num{color:var(--molu-accent)}
+.cal-day.sel{border-color:var(--molu-accent);box-shadow:inset 0 0 0 1px var(--molu-accent)}
+.cal-num{font-size:13px;font-weight:800}
+.cal-pct{font-size:10px;font-weight:700;min-height:13px}
+.cal-kg{font-size:10px;font-weight:700;color:var(--molu-muted);min-height:13px;font-variant-numeric:tabular-nums}
+.cal-day.g-good{background:color-mix(in srgb,var(--molu-ok) 16%,var(--molu-bg))}.cal-day.g-good .cal-pct{color:var(--molu-ok)}
+.cal-day.g-ok{background:color-mix(in srgb,var(--molu-warning) 14%,var(--molu-bg))}.cal-day.g-ok .cal-pct{color:var(--molu-warning)}
+.cal-day.g-low{background:color-mix(in srgb,var(--molu-error) 12%,var(--molu-bg))}.cal-day.g-low .cal-pct{color:var(--molu-error)}
+.cal-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-bottom:6px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.dot.g-good{background:var(--molu-ok)}.dot.g-ok{background:var(--molu-warning)}.dot.g-low{background:var(--molu-error)}
+.meal-check{padding:10px 0;border-top:1px solid var(--molu-line)}
+.meal-check .row{margin-bottom:6px}
+.seg.sub{margin-top:6px}.seg.sub button{min-height:34px;font-size:13px}
+.advice{font-size:17px;margin:2px 0 4px}

@@ -1,4 +1,4 @@
-import { ChevronLeft, Home as HomeIcon, Menu, Salad, Scale, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Home as HomeIcon, Menu, Salad, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAppData } from './state/useAppData';
 import Chat from './screens/Chat';
@@ -9,15 +9,15 @@ import Report from './screens/Report';
 import SettingsScreen from './screens/Settings';
 import Shopping from './screens/Shopping';
 import Spend from './screens/Spend';
-import Weight from './screens/Weight';
+import Log from './screens/Log';
 
-export type Screen = 'home' | 'diet' | 'spend' | 'weight' | 'more' | 'shopping' | 'report' | 'chat' | 'settings';
+export type Screen = 'home' | 'diet' | 'log' | 'spend' | 'more' | 'shopping' | 'report' | 'chat' | 'settings';
 
 const TABS: { id: Screen; label: string; Icon: typeof HomeIcon }[] = [
   { id: 'home', label: '홈', Icon: HomeIcon },
   { id: 'diet', label: '식단', Icon: Salad },
+  { id: 'log', label: '기록', Icon: CalendarDays },
   { id: 'spend', label: '지출', Icon: Wallet },
-  { id: 'weight', label: '체중', Icon: Scale },
   { id: 'more', label: '더보기', Icon: Menu },
 ];
 const SUB: Partial<Record<Screen, string>> = { shopping: '장보기', report: '월별 리포트', chat: 'Claude', settings: '설정' };
@@ -54,7 +54,7 @@ export default function App() {
         ) : (
           <span className="brand">증량 가계부</span>
         )}
-        {data && <span className="screen-title">{data.today.slice(5).replace('-', '/')}</span>}
+        {data && <span className="screen-title">{data.today.replaceAll('-', '. ')}</span>}
       </header>
       <main>
         {!data ? (
@@ -64,7 +64,7 @@ export default function App() {
             {screen === 'home' && <Home data={data} navigate={navigate} />}
             {screen === 'diet' && <Diet data={data} />}
             {screen === 'spend' && <Spend data={data} />}
-            {screen === 'weight' && <Weight data={data} />}
+            {screen === 'log' && <Log data={data} />}
             {screen === 'more' && <More navigate={navigate} />}
             {screen === 'shopping' && <Shopping data={data} />}
             {screen === 'report' && <Report data={data} />}

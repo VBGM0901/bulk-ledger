@@ -1,4 +1,4 @@
-import type { DinnerChoice, Expense, FinishEvent, ISODate, PurchaseLine, Settings } from '../domain/types';
+import type { DinnerChoice, Expense, FinishEvent, ISODate, MealStatus, PurchaseLine, Settings } from '../domain/types';
 import type { AppDB } from './db';
 
 export const newId = (): string => crypto.randomUUID();
@@ -66,6 +66,27 @@ export async function adjustStock(db: AppDB, foodId: string, date: ISODate, qty:
 
 export async function setDinner(db: AppDB, date: ISODate, choice: DinnerChoice): Promise<void> {
   await db.dinners.put({ date, choice });
+}
+
+/** 하루 끼니 기록. status=null이면 그 끼니 체크를 지운다. */
+export async function setMealStatus(db: AppDB, date: ISODate, meal: string, status: MealStatus | null): Promise<void> {
+  await db.transaction('rw', db.intakes, async () => {
+    const cur = (await db.intakes.get(date))?.meals ?? {};
+    const meals = { ...cur };
+    if (status === null) delete meals[meal];
+    else meals[meal] = status;
+    if (Object.keys(meals).length === 0) await db.intakes.delete(date);
+    else await db.intakes.put({ date, meals });
+  });
+}
+
+/** 하루 끼니를 한 번에 '다 먹음'으로. */
+export async function markAllEaten(db: AppDB, date: ISODate, mealNames: string[]): Promise<void> {
+  await db.intakes.put({ date, meals: Object.fromEntries(mealNames.map((m) => [m, 'all' as const])) });
+}
+
+export async function deleteWeight(db: AppDB, date: ISODate): Promise<void> {
+  await db.weights.delete(date);
 }
 
 export async function logWeight(db: AppDB, date: ISODate, kg: number): Promise<void> {

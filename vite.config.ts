@@ -23,7 +23,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,png,svg}'] },
+      workbox: { globPatterns: ['**/*.{js,css,html,png,svg,woff2}'] },
     }),
   ],
   test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },

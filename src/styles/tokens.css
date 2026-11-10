@@ -14,7 +14,7 @@
   --hero:linear-gradient(108deg,#08172f 0%,#101e38 55%,#1a2e4e 100%);
 }
 html{background:var(--molu-bg)}
-body{margin:0;background:var(--molu-bg);color:var(--molu-ink);font-family:"Apple SD Gothic Neo",Paperlogy,"Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--molu-bg);color:var(--molu-ink);font-family:Paperlogy,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:inherit;text-decoration:none}
