@@ -238,7 +238,7 @@ describe('Chat (대화방)', () => {
     fireEvent.change(screen.getByLabelText('메시지'), { target: { value: '나 잘 먹고 있어?' } });
     fireEvent.click(screen.getByRole('button', { name: '보내기' }));
     expect(await screen.findByText('잘 먹고 있어요')).toBeInTheDocument();
-    expect((await db.chats.toArray()).map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect((await db.chats.orderBy('at').toArray()).map((m) => m.role)).toEqual(['user', 'assistant']);
     unmount();
     render(<Chat data={data} navigate={() => {}} />);
     expect(await screen.findByText('나 잘 먹고 있어?')).toBeInTheDocument();

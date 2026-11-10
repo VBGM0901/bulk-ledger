@@ -47,7 +47,9 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
       // API는 user로 시작해야 한다
       while (history.length && history[0].role !== 'user') history.shift();
       const answer = await askClaude(data, history);
-      await db.chats.put({ id: newId(), at: new Date().toISOString(), role: 'assistant', content: answer });
+      // 답은 항상 질문보다 뒤에 정렬되도록 (같은 밀리초 방지)
+      const at = new Date(Math.max(Date.now(), Date.parse(userMsg.at) + 1)).toISOString();
+      await db.chats.put({ id: newId(), at, role: 'assistant', content: answer });
     } catch (e) {
       // 실패한 질문은 지우고 입력칸에 돌려놓는다
       await db.chats.delete(userMsg.id);
