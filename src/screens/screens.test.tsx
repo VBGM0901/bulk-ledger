@@ -467,3 +467,25 @@ describe('지금 남은 돈', () => {
     expect(screen.getByText(/지금 남은 돈 · 11\/10 입력/)).toBeInTheDocument();
   });
 });
+
+describe('홈 동기부여', () => {
+  const goal = { startKg: 54, targetKg: 60, startDate: '2026-11-01', endDate: '2027-02-01' };
+  const all = Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all' as const]));
+
+  test('goal progress bar shows % and kg left', () => {
+    const d = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, weightGoal: goal }, weights: [{ date: TODAY, kg: 55.5 }] }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    expect(screen.getByLabelText('목표 체중 진행 25%')).toBeInTheDocument();
+    expect(screen.getByText(/4.5kg 남음/)).toBeInTheDocument();
+  });
+
+  test('streak, today success label and +1kg celebration', () => {
+    const intakes = ['2026-11-08', '2026-11-09', TODAY].map((date) => ({ date, meals: all }));
+    const weights = Array.from({ length: 10 }, (_, i) => ({ date: addDays('2026-11-01', i), kg: 55.2 }));
+    const d = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, weightGoal: goal }, intakes, weights }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    expect(screen.getByText(/일 연속 잘 먹음/)).toHaveTextContent('3일 연속');
+    expect(screen.getByText(/오늘 목표 달성/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '달성 축하' })).toBeNull(); // 11-01에 이미 넘음 → 3일 지나 안 보임
+  });
+});

@@ -207,3 +207,12 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .chip-btn.paid b{color:var(--molu-ok)}
 .chip-btn{font-size:13px}
 .cat-row{margin-bottom:4px}
+/* 목표 체중 진행 · 동기부여 */
+.goal-progress{padding:2px 0 6px}
+.goal-progress b.num{font-size:18px}
+.goal-bar{height:12px;border-radius:99px;background:var(--molu-soft);overflow:hidden;margin:6px 0 4px}
+.goal-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--molu-accent),var(--molu-ok))}
+.celebrate{display:grid;gap:2px;border-color:var(--molu-ok);background:color-mix(in srgb,var(--molu-ok) 10%,var(--molu-card))}
+.celebrate b{font-size:17px;color:var(--molu-ok)}
+.streak{font-size:14px;font-weight:700;color:var(--molu-warning)}
+.streak b{font-size:16px}

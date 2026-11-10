@@ -7,6 +7,7 @@ import { weeklyReview } from '../domain/checkin';
 import { addDays } from '../domain/dates';
 import { dayIntake } from '../domain/intake';
 import { formatNum } from '../domain/money';
+import { eatingStreak, goalProgress, recentMilestone } from '../domain/motivation';
 import { forecastDate, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
@@ -21,11 +22,13 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
   const avg = movingAverage(data.weights, data.today);
   const goal = settings.weightGoal;
   const forecast = forecastDate(data.weights, goal, data.today);
+  const progress = goalProgress(data.weights, goal, data.today);
+  const milestone = recentMilestone(data.weights, goal, data.today);
 
   return (
     <>
       <button className="hero hero-btn" onClick={() => navigate('log')} aria-label={`오늘 ${kcal}kcal 먹음. 눌러서 먹은 것 체크하기`}>
-        <div className="label">오늘 먹은 칼로리 · 눌러서 체크</div>
+        <div className="label">{it?.grade === 'good' ? '오늘 목표 달성 💪 잘했어요' : '오늘 먹은 칼로리 · 눌러서 체크'}</div>
         <div className="big num">{formatNum(kcal)}<small> / {formatNum(target)} kcal</small></div>
         <div className="hero-bar" aria-hidden><span style={{ width: `${pct}%` }} /></div>
         <div className="label">단백질 <span className="num">{formatNum(protein, 0)}g</span> / {settings.proteinTarget.join('~')}g · {pct}%</div>
@@ -37,13 +40,34 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
         </button>
       )}
 
+      {milestone && (
+        <section className="card celebrate" aria-label="달성 축하">
+          <b>🎉 +{milestone.gained}kg 달성!</b>
+          <span>7일 평균이 {milestone.kg}kg을 넘었어요.{progress && progress.left > 0 ? ` 목표까지 ${formatNum(progress.left, 1)}kg` : ' 목표 도착!'}</span>
+        </section>
+      )}
+
       <WeeklyCheckin data={data} navigate={navigate} />
 
       <WeekStamp data={data} onOpen={() => navigate('log')} />
 
       <Card title="체중">
         <QuickWeight data={data} />
-        <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} sub={goal ? `목표 ${goal.targetKg}kg` : undefined} />
+        {goal && progress ? (
+          <div className="goal-progress" aria-label={`목표 체중 진행 ${Math.round(progress.pct)}%`}>
+            <div className="money-row">
+              <span><b className="num">{formatNum(progress.now, 1)}kg</b> <small className="muted">7일 평균</small></span>
+              <span className="muted">목표 <b className="num">{goal.targetKg}kg</b></span>
+            </div>
+            <div className="goal-bar"><span style={{ width: `${Math.max(2, progress.pct)}%` }} /></div>
+            <div className="money-row">
+              <small className="muted">시작 {goal.startKg}kg</small>
+              <small><b className="ok num">{Math.round(progress.pct)}%</b> · {progress.left > 0 ? `${formatNum(progress.left, 1)}kg 남음` : '도착!'}</small>
+            </div>
+          </div>
+        ) : (
+          <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
+        )}
         {goal && forecast && <Stat label="도달 예상" value={`${Number(forecast.slice(5, 7))}월 ${Number(forecast.slice(8))}일쯤`} tone={forecast <= goal.endDate ? 'ok' : 'warn'} />}
         <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
       </Card>
@@ -62,11 +86,16 @@ function WeekStamp({ data, onOpen }: { data: AppData; onOpen: () => void }) {
     return { w, date, it: dayIntake(date, data.foods, data.settings, data.dinners, data.intakes), future: date > data.today };
   });
   const good = days.filter((d) => d.it?.grade === 'good').length;
+  const streak = eatingStreak(data.today, data.foods, data.settings, data.dinners, data.intakes);
   return (
     <button className="card week-stamp" onClick={onOpen} aria-label={`이번 주 잘 먹은 날 ${good}일. 눌러서 기록 보기`}>
       <div className="row">
         <h2>이번 주</h2>
-        <span className="muted">95% 이상 먹은 날 <b className="num ok">{good}</b>/7</span>
+        {streak.current > 0 ? (
+          <span className="streak">🔥 <b className="num">{streak.current}</b>일 연속 잘 먹음{streak.best > streak.current ? <small className="muted"> · 최고 {streak.best}일</small> : ''}</span>
+        ) : (
+          <span className="muted">95% 이상 먹은 날 <b className="num ok">{good}</b>/7{streak.best > 0 ? ` · 최고 연속 ${streak.best}일` : ''}</span>
+        )}
       </div>
       <div className="stamps">
         {days.map((d) => (
