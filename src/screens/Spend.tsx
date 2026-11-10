@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import type { Screen } from '../App';
-import { Card, Field } from '../components/ui';
+import { Bar, Card, Field } from '../components/ui';
 import { deleteExpense, recordExpense, recordPurchase, updateExpense } from '../db/actions';
 import { db } from '../db/db';
 import { dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
@@ -11,6 +11,7 @@ import { compactKRW, spendByDay } from '../domain/spending';
 import { formatKRW, parseAmount } from '../domain/money';
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory, type PurchaseLine } from '../domain/types';
 import type { AppData } from '../state/useAppData';
+import { MoneyTop } from './Money';
 
 /** 직접 입력용 카테고리 ('식단'은 식단 구매 기록으로만 생긴다) */
 const CATS: ExpenseCategory[] = EXPENSE_CATEGORIES.filter((c) => c !== '식단');
@@ -41,6 +42,10 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
     setDayPick(null);
   };
   const monthTotal = days.reduce((t, d) => t + spend[d].total, 0);
+  // 이 달 카테고리별 합계 (큰 순)
+  const byCat = new Map<string, number>();
+  for (const e of data.expenses) if (e.date.startsWith(month.slice(0, 7))) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
+  const cats = [...byCat.entries()].sort((x, y) => y[1] - x[1]);
 
   const all = data.expenses
     .filter((e) => (dayPick ? e.date === dayPick : e.date.startsWith(month.slice(0, 7))))
@@ -85,6 +90,8 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
 
   return (
     <>
+      <MoneyTop data={data} navigate={navigate} />
+
       <button className="card hint-card" onClick={() => navigate('chat')}>
         <MessageCircle size={20} aria-hidden />
         <span>
@@ -148,6 +155,17 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
           <span>🛒 식단 장보기</span>
         </div>
       </Card>
+
+      {cats.length > 0 && (
+        <Card title={`${m}월 어디에 썼나`}>
+          {cats.map(([c, v]) => (
+            <div key={c} className="cat-row">
+              <div className="money-row"><span>{c}</span><b className="num">{formatKRW(v)}</b></div>
+              <Bar value={v} max={cats[0][1]} label={`${c} 지출`} />
+            </div>
+          ))}
+        </Card>
+      )}
 
       <Card
         title={dayPick ? `${Number(dayPick.slice(5, 7))}월 ${Number(dayPick.slice(8))}일 지출` : `${m}월 지출 목록`}

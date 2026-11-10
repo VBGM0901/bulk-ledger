@@ -55,13 +55,16 @@ export function deriveAppData(raw: RawData, today: ISODate) {
     .sort()[0];
   const since = last ?? firstRecord ?? null;
   const backupStale = since !== null && daysBetween(since, today) > 7;
-  const balance = balanceNow(settings.balance, raw.expenses, period, today);
+  const paidIds = settings.paidFixed?.period === period.start ? settings.paidFixed.ids : [];
+  const unpaidFixed = raw.recurring.filter((r) => !paidIds.includes(r.id)).reduce((t, r) => t + (r.monthlyBudget ?? 0), 0);
+  const foodLeft = Math.max(0, plan.total - summary.foodSpent);
+  const balance = balanceNow(settings.balance, raw.expenses, period, today, { unpaidFixed, foodLeft });
   const todayIntake = dayIntake(today, foods, settings, raw.dinners, raw.intakes);
   const recentIntake = recentIntakePct(today, 7, foods, settings, raw.dinners, raw.intakes);
   const advice = bulkAdvice(raw.weights, settings.weightGoal, today, recentIntake?.pct ?? null);
   const needsSetup = raw.incomes.length === 0 && raw.recurring.length === 0;
   return {
-    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup, balance, todayIntake, recentIntake, advice,
+    today, ...raw, period, plan, summary, dinnerToday, nutrition, dailyPlan, dailyUse, measured, stock, shopping, backupStale, needsSetup, balance, paidIds, todayIntake, recentIntake, advice,
   };
 }
 export type AppData = ReturnType<typeof deriveAppData>;

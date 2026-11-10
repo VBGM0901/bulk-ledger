@@ -195,3 +195,15 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .salary-input{width:150px;text-align:right;font-size:17px}
 .amount-input{display:flex;align-items:center;gap:8px}
 .amount-input small{font-size:12px;font-weight:700}
+/* 홈 맨 위: 오늘 먹은 칼로리 */
+.hero-btn{display:block;width:100%;text-align:left;border:0;cursor:pointer}
+.hero .big small{font-size:16px;font-weight:700;opacity:.85}
+.hero-bar{height:8px;border-radius:99px;background:#ffffff33;overflow:hidden;margin:4px 0 8px}
+.hero-bar span{display:block;height:100%;border-radius:99px;background:#fff}
+.money-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-height:32px}
+.money-row small{font-size:12px}
+.fixed-list{padding:4px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--molu-line)}
+.chip-btn.paid{background:color-mix(in srgb,var(--molu-ok) 14%,var(--molu-bg));border-color:var(--molu-ok);color:var(--molu-ok)}
+.chip-btn.paid b{color:var(--molu-ok)}
+.chip-btn{font-size:13px}
+.cat-row{margin-bottom:4px}

@@ -21,29 +21,47 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('Home', () => {
-  test('remaining budget, daily allowance, nutrition, backup warning', () => {
+describe('Home (증량)', () => {
+  test('top shows today calories; no money on home; backup warning stays', () => {
     render(<Home data={deriveAppData(rawFixture({ ...SAMPLE_BUDGET, weights: [{ date: '2026-11-01', kg: 70 }] }), TODAY)} navigate={() => {}} />);
-    expect(screen.getByText('1,200,180원')).toBeInTheDocument();
-    expect(screen.getByText('40,006원')).toBeInTheDocument();
-    expect(screen.getByText(/0 \/ 2,800 kcal/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /오늘 0kcal 먹음/ })).toBeInTheDocument();
+    expect(screen.queryByText('1,200,180원')).toBeNull();
     expect(screen.getByText(/백업한 지 7일이 넘었어요/)).toBeInTheDocument();
   });
 
-  test('missing income shows 미입력 warning; empty budget shows setup prompt', () => {
-    render(<Home data={deriveAppData(rawFixture({ incomes: [{ id: 'i', name: '월급', amount: null }] }), TODAY)} navigate={() => {}} />);
-    expect(screen.getByText(/미입력: 월급/)).toBeInTheDocument();
-    render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
-    expect(screen.getByText(/수입·고정비가 아직 없어요/)).toBeInTheDocument();
-  });
-
-  test('today card shows what was actually eaten, and 체크하기 opens the log', () => {
+  test('top card shows what was actually eaten and opens the log', () => {
     const nav = vi.fn();
     const d = deriveAppData(rawFixture({ intakes: [{ date: TODAY, meals: {}, items: { 아침: { juice: 0, yogurt: 1, egg: 0 } } }] }), TODAY);
     render(<Home data={d} navigate={nav} />);
-    expect(screen.getByText(/135 \/ 2,800 kcal/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '체크하기' }));
+    fireEvent.click(screen.getByRole('button', { name: /오늘 135kcal 먹음/ }));
     expect(nav).toHaveBeenCalledWith('log');
+  });
+});
+
+describe('지출 탭 돈 부분', () => {
+  test('spendable money and daily amount', () => {
+    render(<Spend data={deriveAppData(rawFixture(SAMPLE_BUDGET), TODAY)} navigate={() => {}} />);
+    expect(screen.getByText('1,200,180원')).toBeInTheDocument();
+    expect(screen.getByText('40,006원')).toBeInTheDocument();
+  });
+
+  test('missing income shows 미입력 warning; empty budget shows setup prompt', () => {
+    render(<Spend data={deriveAppData(rawFixture({ incomes: [{ id: 'i', name: '월급', amount: null }] }), TODAY)} navigate={() => {}} />);
+    expect(screen.getByText(/미입력: 월급/)).toBeInTheDocument();
+    render(<Spend data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    expect(screen.getByText(/수입·고정비가 아직 없어요/)).toBeInTheDocument();
+  });
+
+  test('fixed cost check: tapping marks it paid for this budget month, and the balance daily amount reserves unpaid ones', async () => {
+    const recurring = [{ id: 'r1', name: '빚', category: '고정' as const, monthlyBudget: 300_000, dueDay: null, memo: '' }];
+    const d = deriveAppData(rawFixture({ incomes: [{ id: 'i', name: '월급', amount: 3_000_000 }], recurring, settings: { ...DEFAULT_SETTINGS, balance: { amount: 1_000_000, date: TODAY } } }), TODAY);
+    // 안 낸 고정비 30만 + 남은 장보기 계획(299,820)을 빼고 30일로 나눔
+    expect(d.balance!.daily).toBe(Math.floor((1_000_000 - 300_000 - 299_820) / 30));
+    render(<Spend data={d} navigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /빚 300,000원/ }));
+    await waitFor(async () => expect((await db.settings.get('settings'))!.paidFixed).toEqual({ period: '2026-11-10', ids: ['r1'] }));
+    const paid = deriveAppData(rawFixture({ incomes: [{ id: 'i', name: '월급', amount: 3_000_000 }], recurring, settings: { ...DEFAULT_SETTINGS, balance: { amount: 1_000_000, date: TODAY }, paidFixed: { period: '2026-11-10', ids: ['r1'] } } }), TODAY);
+    expect(paid.balance!.daily).toBe(Math.floor((1_000_000 - 299_820) / 30));
   });
 });
 
@@ -80,7 +98,7 @@ describe('Diet', () => {
 
 describe('Spend', () => {
   const data = () => deriveAppData(rawFixture({ expenses: [{ id: 'x', date: TODAY, amount: 1500, category: '추가식품', memo: '삼각김밥', source: 'manual' }] }), TODAY);
-  const open = () => fireEvent.click(screen.getByRole('button', { name: /직접 입력/ }));
+  const open = () => fireEvent.click(screen.getByRole('button', { name: /^직접 입력/ }));
 
   test('shows this month list with summary; manual forms are folded until opened', () => {
     render(<Spend data={data()} navigate={() => {}} />);
@@ -380,8 +398,8 @@ describe('홈 바로 입력', () => {
     await waitFor(async () => expect((await db.weights.get(TODAY))?.kg).toBe(54.2));
   });
 
-  test('salary: typing on home updates the first income (or creates 월급)', async () => {
-    render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+  test('salary: typing on 지출 tab updates the first income (or creates 월급)', async () => {
+    render(<Spend data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
     const f = screen.getByLabelText('월급');
     fireEvent.focus(f);
     fireEvent.change(f, { target: { value: '2,100,000' } });
@@ -436,7 +454,7 @@ describe('고치기 · 자주 쓰는 것', () => {
 describe('지금 남은 돈', () => {
   test('typing saves by itself (no need to leave the field) and the top number switches to it', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    render(<Home data={deriveAppData(rawFixture(SAMPLE_BUDGET), TODAY)} navigate={() => {}} />);
+    render(<Spend data={deriveAppData(rawFixture(SAMPLE_BUDGET), TODAY)} navigate={() => {}} />);
     const f = screen.getByLabelText('지금 남은 돈');
     fireEvent.focus(f);
     fireEvent.change(f, { target: { value: '450,000' } });
@@ -444,7 +462,7 @@ describe('지금 남은 돈', () => {
     vi.useRealTimers();
     await waitFor(async () => expect((await db.settings.get('settings'))!.balance).toEqual({ amount: 450_000, date: TODAY }));
     const d = deriveAppData(rawFixture({ ...SAMPLE_BUDGET, settings: { ...DEFAULT_SETTINGS, balance: { amount: 450_000, date: TODAY } } }), TODAY);
-    render(<Home data={d} navigate={() => {}} />);
+    render(<Spend data={d} navigate={() => {}} />);
     expect(screen.getByText('450,000원')).toBeInTheDocument();
     expect(screen.getByText(/지금 남은 돈 · 11\/10 입력/)).toBeInTheDocument();
   });

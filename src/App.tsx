@@ -52,7 +52,7 @@ export default function App() {
             <ChevronLeft size={18} aria-hidden /> {SUB[screen]}
           </button>
         ) : (
-          <span className="brand">증량 가계부</span>
+          <span className="brand">증량 노트</span>
         )}
         {data && <span className="screen-title">{data.today.replaceAll('-', '. ')}</span>}
       </header>

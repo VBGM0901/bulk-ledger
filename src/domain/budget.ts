@@ -61,8 +61,12 @@ export interface Balance { amount: number; date: ISODate }
 export interface BalanceNow {
   /** 입력한 금액 − 그 다음 날부터 오늘까지 기록한 지출 */
   now: number;
-  /** 남은 날로 나눈 하루 쓸 수 있는 돈 */
+  /** 아직 안 나간 고정비 + 아직 안 산 장보기 계획을 빼고 남는 돈 */
+  free: number;
+  /** free를 남은 날로 나눈 하루 쓸 수 있는 돈 */
   daily: number;
+  unpaidFixed: number;
+  foodLeft: number;
   since: ISODate;
   spentSince: number;
 }
@@ -71,10 +75,15 @@ export interface BalanceNow {
  * 사용자가 직접 넣은 '지금 남은 돈'. 이번 예산월 안에서 넣은 값만 쓴다 (월급날이 지나면 다시 넣어야 함).
  * 입력한 날의 지출은 이미 반영됐다고 보고, 그 다음 날부터 기록한 지출만 뺀다.
  */
-export function balanceNow(b: Balance | null | undefined, expenses: Expense[], period: Period, today: ISODate): BalanceNow | null {
+export function balanceNow(
+  b: Balance | null | undefined, expenses: Expense[], period: Period, today: ISODate,
+  reserved: { unpaidFixed: number; foodLeft: number } = { unpaidFixed: 0, foodLeft: 0 },
+): BalanceNow | null {
   if (!b || b.date < period.start || b.date > today) return null;
   const spentSince = expenses.filter((e) => e.date > b.date && e.date <= today).reduce((t, e) => t + e.amount, 0);
   const now = b.amount - spentSince;
   const daysLeft = Math.max(1, Math.min(period.days, daysInclusive(today, period.end)));
-  return { now, daily: Math.floor(Math.max(0, now) / daysLeft), since: b.date, spentSince };
+  // 통장에 아직 있지만 곧 나갈 돈(안 낸 고정비, 아직 안 산 장보기)은 빼고 하루 금액을 낸다
+  const free = now - reserved.unpaidFixed - reserved.foodLeft;
+  return { now, free, daily: Math.floor(Math.max(0, free) / daysLeft), since: b.date, spentSince, ...reserved };
 }

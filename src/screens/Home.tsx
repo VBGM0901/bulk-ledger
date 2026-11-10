@@ -1,60 +1,36 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Screen } from '../App';
-import { Bar, Card, Notice, Stat } from '../components/ui';
-import { depletionDate } from '../domain/consumption';
-import { addDays } from '../domain/dates';
-import { formatKRW, formatNum, parseAmount } from '../domain/money';
-import { shortName } from '../domain/display';
-import { weeklyReview } from '../domain/checkin';
-import { dayIntake } from '../domain/intake';
-import { logWeight, updateSettings, weeklyCheckin } from '../db/actions';
+import { Card, Stat } from '../components/ui';
+import { logWeight, weeklyCheckin } from '../db/actions';
 import { db } from '../db/db';
-import { movingAverage } from '../domain/weight';
+import { weeklyReview } from '../domain/checkin';
+import { addDays } from '../domain/dates';
+import { dayIntake } from '../domain/intake';
+import { formatNum } from '../domain/money';
+import { forecastDate, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
-const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-
+/** 홈 = 증량. 맨 위는 오늘 먹은 칼로리, 그다음 이번 주·체중. 돈은 가계부 탭에. */
 export default function Home({ data, navigate }: { data: AppData; navigate: (s: Screen) => void }) {
-  const { summary: s, settings, period } = data;
+  const { settings } = data;
+  const it = data.todayIntake;
+  const kcal = it?.kcal ?? 0;
+  const target = it?.target ?? settings.kcalTarget;
+  const protein = it?.protein ?? 0;
+  const pct = Math.min(100, Math.round((kcal / Math.max(1, target)) * 100));
   const avg = movingAverage(data.weights, data.today);
-  const soonLimit = addDays(data.today, 3);
-  const tracked = new Set(data.stockEvents.map((e) => e.foodId));
-  const planned = data.foods.filter((f) => !f.free && (data.dailyUse[f.id] ?? 0) > 0);
-  const soon = planned
-    .filter((f) => tracked.has(f.id))
-    .map((f) => ({ f, date: depletionDate(data.stock[f.id] ?? 0, data.dailyUse[f.id], data.today) }))
-    .filter((x): x is { f: typeof x.f; date: string } => x.date !== null && x.date <= soonLimit);
+  const goal = settings.weightGoal;
+  const forecast = forecastDate(data.weights, goal, data.today);
 
   return (
     <>
-      <section className="hero">
-        {data.balance ? (
-          <>
-            <div className="label">지금 남은 돈 · {md(data.balance.since)} 입력{data.balance.spentSince ? ` 후 ${formatKRW(data.balance.spentSince)} 씀` : ''}</div>
-            <div className="big num">{formatKRW(data.balance.now)}</div>
-            <div className="label">
-              하루 사용 가능 <span className="num">{formatKRW(data.balance.daily)}</span> · {s.daysLeft}일 남음 · 계획상 {formatKRW(s.remaining)}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="label">{md(period.start)} ~ {md(period.end)} 고정비·식비 빼고 쓸 수 있는 돈</div>
-            <div className="big num">{data.needsSetup ? '입력 필요' : formatKRW(s.remaining)}</div>
-            <div className="label">
-              하루 사용 가능 <span className="num">{formatKRW(s.dailyAllowance)}</span> · {s.daysLeft}일 남음
-            </div>
-          </>
-        )}
-      </section>
+      <button className="hero hero-btn" onClick={() => navigate('log')} aria-label={`오늘 ${kcal}kcal 먹음. 눌러서 먹은 것 체크하기`}>
+        <div className="label">오늘 먹은 칼로리 · 눌러서 체크</div>
+        <div className="big num">{formatNum(kcal)}<small> / {formatNum(target)} kcal</small></div>
+        <div className="hero-bar" aria-hidden><span style={{ width: `${pct}%` }} /></div>
+        <div className="label">단백질 <span className="num">{formatNum(protein, 0)}g</span> / {settings.proteinTarget.join('~')}g · {pct}%</div>
+      </button>
 
-      {data.needsSetup && (
-        <button className="card warn" style={{ textAlign: 'left' }} onClick={() => navigate('settings')}>
-          수입·고정비가 아직 없어요. 눌러서 설정에서 개인 데이터 파일을 불러오거나 직접 입력하세요.
-        </button>
-      )}
-      {s.missing.length > 0 && <Notice tone="warn">미입력: {s.missing.join(', ')} — 설정에서 입력하세요.</Notice>}
-      {s.overBudget && !data.needsSetup && <Notice tone="err">고정비·식단 계획·쓴 돈을 합치면 수입보다 {formatKRW(-s.remaining)} 많아요.</Notice>}
-      {data.plan.missing.length > 0 && <Notice tone="warn">가격이 없는 식품이 있어 식단비가 덜 잡혔어요: {data.plan.missing.map((id) => shortName(data.foods.find((f) => f.id === id))).join(', ')}</Notice>}
       {data.backupStale && (
         <button className="card warn" style={{ textAlign: 'left' }} onClick={() => navigate('settings')}>
           백업한 지 7일이 넘었어요. 눌러서 백업하기
@@ -63,52 +39,14 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
 
       <WeeklyCheckin data={data} navigate={navigate} />
 
-      <Card title="오늘 먹은 것" action={<button className="btn primary" onClick={() => navigate('log')}>체크하기</button>}>
-        {(() => {
-          const it = data.todayIntake;
-          const kcal = it?.kcal ?? 0;
-          const protein = it?.protein ?? 0;
-          return (
-            <>
-              <Stat
-                label="칼로리"
-                value={`${formatNum(kcal)} / ${formatNum(it?.target ?? settings.kcalTarget)} kcal`}
-                tone={it ? (it.grade === 'good' ? 'ok' : 'warn') : undefined}
-              />
-              <Bar value={kcal} max={it?.target ?? settings.kcalTarget} label="오늘 칼로리 목표 대비" />
-              <Stat
-                label="단백질"
-                value={`${formatNum(protein, 0)} / ${settings.proteinTarget.join('~')} g`}
-                tone={it ? (protein >= settings.proteinTarget[0] ? 'ok' : 'warn') : undefined}
-              />
-            </>
-          );
-        })()}
-      </Card>
-
       <WeekStamp data={data} onOpen={() => navigate('log')} />
-
-      <Card title="이번 예산월 돈">
-        <SalaryField data={data} />
-        <BalanceField data={data} />
-        <Stat label="고정·정기" value={formatKRW(s.fixed)} />
-        <Stat label={s.foodSpent > s.foodPlan ? '식단 (계획보다 더 삼)' : '식단 계획'} value={formatKRW(Math.max(s.foodPlan, s.foodSpent))} />
-        <Stat label="식단 외 지출" value={formatKRW(s.otherSpent)} />
-      </Card>
 
       <Card title="체중">
         <QuickWeight data={data} />
-        <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} />
+        <Stat label="7일 평균" value={avg === null ? '기록 없음' : `${formatNum(avg, 1)} kg`} sub={goal ? `목표 ${goal.targetKg}kg` : undefined} />
+        {goal && forecast && <Stat label="도달 예상" value={`${Number(forecast.slice(5, 7))}월 ${Number(forecast.slice(8))}일쯤`} tone={forecast <= goal.endDate ? 'ok' : 'warn'} />}
         <Stat label="제안" value={data.advice.title} tone={data.advice.kind === 'on-track' ? 'ok' : data.advice.kind === 'need-data' ? undefined : 'warn'} />
       </Card>
-
-      {soon.length > 0 && (
-        <Card title="곧 사야 함" action={<button className="btn" onClick={() => navigate('shopping')}>장보기</button>}>
-          {soon.map(({ f, date }) => (
-            <Stat key={f.id} label={f.name} value={date <= data.today ? '재고 없음' : `${md(date)} 소진`} tone="warn" />
-          ))}
-        </Card>
-      )}
     </>
   );
 }
@@ -220,83 +158,3 @@ function QuickWeight({ data }: { data: AppData }) {
   );
 }
 
-/**
- * 금액 입력칸: 쓰는 동안 0.8초 멈추면 자동 저장, 칸에서 나와도 저장 (아이폰 숫자 키패드엔 완료 키가 없어서).
- * 입력 중엔 바깥 값으로 덮어쓰지 않는다.
- */
-function AmountInput({ label, value, placeholder, onSave }: {
-  label: string; value: number | null; placeholder: string; onSave: (v: number | null) => Promise<void>;
-}) {
-  const fmt = (v: number | null) => (v === null ? '' : v.toLocaleString('ko-KR'));
-  const [draft, setDraft] = useState(fmt(value));
-  const [focused, setFocused] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  const shown = focused ? draft : fmt(value);
-  async function commit(text: string) {
-    window.clearTimeout(timer.current);
-    const v = text.trim() === '' ? null : parseAmount(text);
-    if (text.trim() !== '' && (v === null || v < 0)) return;
-    if (v === value) return;
-    await onSave(v);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1500);
-  }
-  return (
-    <span className="amount-input">
-      {saved && <small className="ok">저장됨</small>}
-      <input
-        className="input num salary-input"
-        inputMode="numeric"
-        aria-label={label}
-        value={shown}
-        placeholder={placeholder}
-        onFocus={() => { setDraft(fmt(value)); setFocused(true); }}
-        onChange={(e) => {
-          const t = e.target.value;
-          setDraft(t);
-          window.clearTimeout(timer.current);
-          timer.current = window.setTimeout(() => commit(t), 800);
-        }}
-        onBlur={(e) => { setFocused(false); commit(e.target.value); }}
-      />
-    </span>
-  );
-}
-
-/** 월급: 바로 입력 (설정의 첫 번째 수입과 같은 값) */
-function SalaryField({ data }: { data: AppData }) {
-  const salary = data.incomes[0];
-  const others = data.incomes.slice(1).reduce((t, i) => t + (i.amount ?? 0), 0);
-  return (
-    <div className="quick-weight">
-      <span className="muted">월급{others ? ` (그 외 수입 ${formatKRW(others)})` : ''}</span>
-      <AmountInput
-        label="월급"
-        value={salary?.amount ?? null}
-        placeholder="월급 입력"
-        onSave={async (v) => {
-          if (v === null) return;
-          if (salary) await db.incomes.update(salary.id, { amount: v });
-          else await db.incomes.put({ id: 'salary', name: '월급', amount: v });
-        }}
-      />
-    </div>
-  );
-}
-
-/** 지금 남은 돈: 통장 잔액 등 실제 금액을 넣으면 홈 맨 위가 그 기준으로 바뀐다. 비우면 계획 기준으로 돌아감 */
-function BalanceField({ data }: { data: AppData }) {
-  const b = data.balance;
-  return (
-    <div className="quick-weight">
-      <span className="muted">지금 남은 돈{b ? ` (${md(b.since)} 기준)` : ''}</span>
-      <AmountInput
-        label="지금 남은 돈"
-        value={b ? data.settings.balance!.amount : null}
-        placeholder="잔액 입력"
-        onSave={(v) => updateSettings(db, { balance: v === null ? null : { amount: v, date: data.today } })}
-      />
-    </div>
-  );
-}

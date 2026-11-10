@@ -10,8 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: '증량 가계부',
-        short_name: '증량가계부',
+        name: '증량 노트',
+        short_name: '증량 노트',
         lang: 'ko',
         display: 'standalone',
         start_url: '/bulk-ledger/',
