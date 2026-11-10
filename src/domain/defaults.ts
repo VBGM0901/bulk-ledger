@@ -6,6 +6,14 @@ const est = { kcal: 'estimate', protein: 'estimate' } as const;
 const kcalOnly = { kcal: 'label', protein: 'estimate' } as const;
 const checked = '2026-11-09';
 
+/** 흰 우유 (일반값 추정: 100ml당 65kcal·단백질 3.2g, 1L 약 2,700원). 실제 제품을 받으면 가격·영양을 고친다. */
+export const MILK: FoodItem = {
+  id: 'milk', name: '흰 우유 1L', unit: 'ml',
+  perUnit: { kcal: 0.65, protein: 0.032 }, nutritionSource: est,
+  packOptions: [{ label: '1L', qty: 1000, price: 2700 }],
+  free: false, priceCheckedAt: null, priceSource: 'unverified', shippingGroup: 'rocketFresh',
+};
+
 export const DEFAULT_FOODS: FoodItem[] = [
   {
     id: 'rice', name: '미트리 자이언트 닭가슴살 볶음밥 3종', unit: '개',
@@ -55,6 +63,7 @@ export const DEFAULT_FOODS: FoodItem[] = [
     packOptions: [{ label: '1kg', qty: 1000, price: 10980 }],
     free: false, priceCheckedAt: checked, priceSource: 'user', shippingGroup: 'rocket',
   },
+  MILK,
   {
     id: 'juice', name: '과일주스(집)', unit: '잔',
     perUnit: { kcal: 120, protein: 0.5 }, nutritionSource: est,
@@ -66,7 +75,7 @@ export const DEFAULT_MEALS: Meal[] = [
   { name: '아침', items: [{ foodId: 'juice', qty: 1 }, { foodId: 'yogurt', qty: 1 }, { foodId: 'egg', qty: 2 }] },
   { name: '오전 간식', items: [{ foodId: 'bread', qty: 2 }, { foodId: 'pb', qty: 32 }, { foodId: 'banana', qty: 1 }] },
   { name: '점심', items: [{ foodId: 'rice', qty: 1 }, { foodId: 'egg', qty: 2 }] },
-  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }] }, // 과일주스는 오후에 못 먹음 (2026-11-10)
+  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'milk', qty: 200 }] }, // 과일주스 대신 우유 (2026-11-10)
   { name: '저녁', items: [{ foodId: 'nuts', qty: 30 }] },
 ];
 
@@ -74,7 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   id: 'settings',
   payday: 10,
   kcalTarget: 2800,
-  proteinTarget: [110, 120],
+  proteinTarget: [90, 110], // 체중 54kg × 1.6~2.0g. 58kg쯤 되면 100~120으로
   weightGoal: null,
   logScope: 'food',
   apiKey: '',

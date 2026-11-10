@@ -1,5 +1,5 @@
 export type ISODate = string; // 'YYYY-MM-DD'
-export type Unit = '개' | '조각' | 'g' | '잔';
+export type Unit = '개' | '조각' | 'g' | '잔' | 'ml';
 export type NutritionSource = 'label' | 'estimate';
 export type PriceSource = 'user' | 'previous' | 'unverified';
 export type ShippingGroup = 'rocketFresh' | 'sellerRocket' | 'sellerFree' | 'rocket' | 'none';

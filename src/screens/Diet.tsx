@@ -14,7 +14,7 @@ import type { AppData } from '../state/useAppData';
 const SHIPPING: Record<ShippingGroup, string> = {
   rocketFresh: '로켓프레시(최소 15,000원)', rocket: '로켓배송', sellerRocket: '판매자로켓', sellerFree: '판매자 무료배송', none: '구매 안 함',
 };
-const UNITS: Unit[] = ['개', '조각', 'g', '잔'];
+const UNITS: Unit[] = ['개', '조각', 'g', '잔', 'ml'];
 const num = (s: string) => Number(s.replace(/[^\d.]/g, ''));
 
 function FinishForm({ food, today, onDone }: { food: FoodItem; today: string; onDone: () => void }) {

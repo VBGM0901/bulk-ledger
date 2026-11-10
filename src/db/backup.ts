@@ -1,4 +1,4 @@
-import { DEFAULT_FOODS, DEFAULT_SETTINGS } from '../domain/defaults';
+import { DEFAULT_FOODS, DEFAULT_MEALS, DEFAULT_SETTINGS, MILK } from '../domain/defaults';
 import { TABLES, type AppDB, type TableName } from './db';
 import type { Settings } from '../domain/types';
 
@@ -10,15 +10,19 @@ export interface BackupFile {
   data: Partial<Record<TableName, unknown[]>>;
 }
 
-/** 예전 기본 식단에서 바뀐 부분을 한 번만 고친다. 사용자가 직접 바꾼 식단은 건드리지 않는다. */
-const OLD_AFTERNOON = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }]);
+/** 예전 기본 식단에서 바뀐 부분을 한 번만 고친다. 사용자가 직접 바꾼 식단·목표는 건드리지 않는다. */
+const AFTERNOON_V1 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }]);
+const AFTERNOON_V2 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }]);
 export function migrateSettings(s: Settings): Settings {
-  const meals = s.meals.map((m) =>
-    m.name === '오후 간식' && JSON.stringify(m.items) === OLD_AFTERNOON
-      ? { ...m, items: m.items.filter((i) => i.foodId !== 'juice') } // 과일주스는 오후에 못 먹음
-      : m,
-  );
-  return { ...s, meals };
+  const afternoon = DEFAULT_MEALS.find((m) => m.name === '오후 간식')!.items;
+  const meals = s.meals.map((m) => {
+    const cur = JSON.stringify(m.items);
+    // 과일주스는 오후에 못 먹음 → 우유 200ml (2026-11-10)
+    return m.name === '오후 간식' && (cur === AFTERNOON_V1 || cur === AFTERNOON_V2) ? { ...m, items: afternoon } : m;
+  });
+  const p = s.proteinTarget;
+  const proteinTarget: [number, number] = p[0] === 110 && p[1] === 120 ? [90, 110] : p;
+  return { ...s, meals, proteinTarget };
 }
 
 export async function ensureDefaults(db: AppDB): Promise<void> {
@@ -27,6 +31,9 @@ export async function ensureDefaults(db: AppDB): Promise<void> {
     if (!s) await db.settings.put(DEFAULT_SETTINGS);
     else await db.settings.put(migrateSettings({ ...DEFAULT_SETTINGS, ...s })); // 새 설정 항목이 생겨도 기본값으로 채움
     if ((await db.foods.count()) === 0) await db.foods.bulkPut(DEFAULT_FOODS);
+    // 식단에 우유가 들어갔는데 식품 목록에 없으면 추가
+    const meals = (await db.settings.get('settings'))?.meals ?? [];
+    if (meals.some((m) => m.items.some((i) => i.foodId === 'milk')) && !(await db.foods.get('milk'))) await db.foods.put(MILK);
   });
 }
 

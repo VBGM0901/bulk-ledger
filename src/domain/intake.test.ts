@@ -7,9 +7,9 @@ const all = Object.fromEntries(names.map((n) => [n, 'all' as const]));
 test('no log → null; all eaten → plan kcal', () => {
   expect(dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [])).toBeNull();
   const d = dayIntake('2026-11-10', DEFAULT_FOODS, DEFAULT_SETTINGS, [], [{ date: '2026-11-10', meals: all }])!;
-  expect(d.kcal).toBe(2626);
+  expect(d.kcal).toBe(2756);
   expect(d.checked).toBe(names.length);
-  expect(d.grade).toBe('ok'); // 2626/2800 = 94%
+  expect(d.grade).toBe('good'); // 2756/2800 = 98%
 });
 
 test('half and none reduce intake; unchecked meals count as 0', () => {

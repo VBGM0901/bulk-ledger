@@ -3,13 +3,13 @@ import { costEfficiency, dailyNutrition } from './nutrition';
 
 test('2,800 template with meat dinner', () => {
   const n = dailyNutrition(DEFAULT_FOODS, DEFAULT_MEALS, DEFAULT_SETTINGS.dinner.meat);
-  expect(n.kcal).toBe(2626);
-  expect(n.protein).toBe(125.2);
-  expect(n.byMeal.map((m) => m.kcal)).toEqual([399, 491, 632, 298, 806]);
+  expect(n.kcal).toBe(2756);
+  expect(n.protein).toBe(131.6);
+  expect(n.byMeal.map((m) => m.kcal)).toEqual([399, 491, 632, 428, 806]);
 });
 
 test('dinner without meat lowers protein by 18g', () => {
-  expect(dailyNutrition(DEFAULT_FOODS, DEFAULT_MEALS, DEFAULT_SETTINGS.dinner.none).protein).toBe(107.2);
+  expect(dailyNutrition(DEFAULT_FOODS, DEFAULT_MEALS, DEFAULT_SETTINGS.dinner.none).protein).toBe(113.6);
 });
 
 test('unknown foodId in template is ignored, not NaN', () => {

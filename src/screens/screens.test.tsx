@@ -24,9 +24,9 @@ afterEach(() => vi.unstubAllGlobals());
 describe('Home', () => {
   test('remaining budget, daily allowance, nutrition, backup warning', () => {
     render(<Home data={deriveAppData(rawFixture({ ...SAMPLE_BUDGET, weights: [{ date: '2026-11-01', kg: 70 }] }), TODAY)} navigate={() => {}} />);
-    expect(screen.getByText('1,216,380원')).toBeInTheDocument();
-    expect(screen.getByText('40,546원')).toBeInTheDocument();
-    expect(screen.getByText(/2,626 \/ 2,800 kcal/)).toBeInTheDocument();
+    expect(screen.getByText('1,200,180원')).toBeInTheDocument();
+    expect(screen.getByText('40,006원')).toBeInTheDocument();
+    expect(screen.getByText(/2,756 \/ 2,800 kcal/)).toBeInTheDocument();
     expect(screen.getByText(/백업한 지 7일이 넘었어요/)).toBeInTheDocument();
   });
 
@@ -158,7 +158,7 @@ describe('Settings', () => {
     const file = new File(['{"app":"x"}'], 'bad.json', { type: 'application/json' });
     fireEvent.change(screen.getByLabelText('백업 불러오기 (지금 데이터를 교체)'), { target: { files: [file] } });
     expect(await screen.findByRole('alert')).toHaveTextContent('이 앱의 백업 파일이 아니에요.');
-    expect(await db.foods.count()).toBe(8);
+    expect(await db.foods.count()).toBe(9);
   });
 
   test('seed merge fills incomes', async () => {
@@ -215,7 +215,7 @@ describe('Log (기록 달력)', () => {
   test('a logged day shows its percent on the calendar', () => {
     const d = deriveAppData(rawFixture({ intakes: [{ date: '2026-11-09', meals: Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all'])) }] }), TODAY);
     render(<Log data={d} />);
-    expect(screen.getByRole('button', { name: /^9일 식사 94% 조금 부족/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^9일 식사 98% 잘 먹음/ })).toBeInTheDocument();
   });
 });
 
@@ -224,7 +224,7 @@ describe('Shopping', () => {
     render(<Shopping data={deriveAppData(rawFixture(), TODAY)} />);
     expect(screen.getByRole('heading', { name: '로켓프레시' })).toBeInTheDocument();
     expect(screen.getByText(/최소 주문 15,000원 충족/)).toBeInTheDocument();
-    expect(screen.getByText('283,620원')).toBeInTheDocument();
+    expect(screen.getByText('299,820원')).toBeInTheDocument();
   });
 });
 

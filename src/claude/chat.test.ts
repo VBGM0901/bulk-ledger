@@ -10,8 +10,8 @@ const data = deriveAppData(
 
 test('context has budget, nutrition, cost efficiency, never the API key', () => {
   const c = buildChatContext(data);
-  expect(c).toContain('남은 예산 1,216,380원');
-  expect(c).toContain('오늘 계획 2,626kcal');
+  expect(c).toContain('남은 예산 1,200,180원');
+  expect(c).toContain('오늘 계획 2,756kcal');
   expect(c).toContain('원/kcal');
   expect(c).toContain('70.1kg');
   expect(c).not.toContain('sk-ant-secret');
