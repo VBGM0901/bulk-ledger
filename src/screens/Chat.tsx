@@ -229,7 +229,7 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
               send(input);
             }
           }}
-          placeholder={hasKey ? '예: 점심에 볶음밥만 먹었어' : '위 칸에 API 키를 먼저 넣어 주세요'}
+          placeholder={hasKey ? '예: 점심에 볶음밥만 먹었어' : '위에 키를 먼저 넣어 주세요'}
           disabled={!hasKey}
         />
         <button className="btn primary icon" aria-label="보내기" disabled={busy || !hasKey || (!input.trim() && !image)}>
