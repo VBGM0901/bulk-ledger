@@ -60,3 +60,12 @@ test('extra foods add to the day', () => {
   expect(d.protein).toBe(5);
   expect(d.checked).toBe(0);
 });
+
+import { targetOn } from './intake';
+test('raising the target with a check-in does not change past days', () => {
+  const s = { ...DEFAULT_SETTINGS, kcalTarget: 3050, checkins: [{ week: '2026-11-16', choice: 'apply' as const, delta: 250, kcalAfter: 3050, at: '2026-11-16T01:00:00.000Z' }] };
+  expect(targetOn('2026-11-10', s)).toBe(2800);
+  expect(targetOn('2026-11-16', s)).toBe(3050);
+  const all = Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all' as const]));
+  expect(dayIntake('2026-11-10', DEFAULT_FOODS, s, [], [{ date: '2026-11-10', meals: all }])!.grade).toBe('good'); // 2756/2800
+});

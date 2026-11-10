@@ -371,3 +371,15 @@ describe('주간 체크인', () => {
     expect(screen.getByText(/이번 주 목표: 3,050kcal/)).toBeInTheDocument();
   });
 });
+
+describe('홈 체중 바로 입력', () => {
+  test('starts from the last weight, +0.1 then 저장 saves today', async () => {
+    const d = deriveAppData(rawFixture({ weights: [{ date: '2026-11-09', kg: 54 }] }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    expect(screen.getByLabelText('오늘 체중(kg)')).toHaveValue('54');
+    fireEvent.click(screen.getByRole('button', { name: '0.1kg 올리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '0.1kg 올리기' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(async () => expect((await db.weights.get(TODAY))?.kg).toBe(54.2));
+  });
+});

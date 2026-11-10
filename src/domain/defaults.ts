@@ -75,8 +75,8 @@ export const DEFAULT_MEALS: Meal[] = [
   { name: '아침', items: [{ foodId: 'juice', qty: 1 }, { foodId: 'yogurt', qty: 1 }, { foodId: 'egg', qty: 2 }] },
   { name: '오전 간식', items: [{ foodId: 'bread', qty: 2 }, { foodId: 'pb', qty: 32 }, { foodId: 'banana', qty: 1 }] },
   { name: '점심', items: [{ foodId: 'rice', qty: 1 }, { foodId: 'egg', qty: 2 }] },
-  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'milk', qty: 200 }] }, // 과일주스 대신 우유 (2026-11-10)
-  { name: '저녁', items: [{ foodId: 'nuts', qty: 30 }] },
+  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }] }, // 과일주스는 오후에 못 먹음
+  { name: '저녁', items: [{ foodId: 'nuts', qty: 30 }, { foodId: 'milk', qty: 200 }] }, // 우유 200ml는 저녁에 (2026-11-10)
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -91,5 +91,5 @@ export const DEFAULT_SETTINGS: Settings = {
   dinner: { meat: { kcal: 650, protein: 30 }, none: { kcal: 650, protein: 12 }, less: { kcal: 400, protein: 10 } },
   meals: DEFAULT_MEALS,
   profileNote: '',
-  migratedV: 1,
+  migratedV: 2,
 };

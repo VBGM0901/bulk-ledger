@@ -82,6 +82,8 @@ export async function setMealStatus(db: AppDB, date: ISODate, meal: string, stat
 export async function copyDayMeals(db: AppDB, from: ISODate, to: ISODate): Promise<boolean> {
   const src = await db.intakes.get(from);
   if (!src || (Object.keys(src.meals).length === 0 && Object.keys(src.items ?? {}).length === 0)) return false;
+  const dinner = await db.dinners.get(from);
+  if (dinner) await db.dinners.put({ date: to, choice: dinner.choice });
   await updateIntake(db, to, (log) => {
     log.meals = { ...src.meals };
     log.items = src.items ? structuredClone(src.items) : undefined;

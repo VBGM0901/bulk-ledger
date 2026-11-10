@@ -29,7 +29,7 @@ const time = (iso: string) => {
 };
 
 /** 키가 없을 때 대화방 맨 위에 뜨는 키 입력칸. 먼저 연결을 확인하고, 되면 저장한다. */
-function KeySetup({ onMore }: { onMore: () => void }) {
+function KeySetup({ onMore, onWarn }: { onMore: () => void; onWarn: (text: string) => void }) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'err' | 'warn'; text: string } | null>(null);
@@ -41,7 +41,9 @@ function KeySetup({ onMore }: { onMore: () => void }) {
     const r = await saveApiKey(db, key);
     setBusy(false);
     if (r.tone !== 'err') setKey('');
-    if (r.tone !== 'ok') setMsg({ tone: r.tone, text: r.text });
+    // 저장은 됐는데 확인을 못 한 경우: 이 칸은 바로 사라지므로 대화방 쪽에 알림을 넘긴다
+    if (r.tone === 'warn') onWarn(r.text);
+    else if (r.tone === 'err') setMsg({ tone: 'err', text: r.text });
   }
 
   return (
@@ -72,7 +74,9 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
   const [image, setImage] = useState<{ mediaType: string; base64: string; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [keyNote, setKeyNote] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const dataRef = useRef(data);
   useEffect(() => {
     dataRef.current = data; // 도구 실행 중에도 최신 앱 데이터를 읽도록
@@ -150,7 +154,12 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
         {msgs.length > 0 && <button className="btn" onClick={clear}>새 대화</button>}
       </div>
 
-      {!hasKey && <KeySetup onMore={() => navigate('settings')} />}
+      {!hasKey && <KeySetup onMore={() => navigate('settings')} onWarn={setKeyNote} />}
+      {hasKey && keyNote && (
+        <p className="card warn" role="status">
+          {keyNote} <button className="link-btn" onClick={() => setKeyNote(null)}>닫기</button>
+        </p>
+      )}
 
       <div className="chat-log" aria-live="polite">
         {msgs.length === 0 && (
@@ -207,7 +216,11 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
         {hasKey && msgs.length > 0 && !image && (
           <div className="quick-chips" aria-label="빠른 문장">
             {QUICK.map((q) => (
-              <button key={q} type="button" onClick={() => (q.endsWith(' ') ? setInput(q) : send(q))} disabled={busy}>{q.trim()}</button>
+              <button key={q} type="button" onClick={() => {
+                if (!q.endsWith(' ')) return send(q);
+                setInput(q);
+                inputRef.current?.focus(); // 아이폰 키보드 바로 열기
+              }} disabled={busy}>{q.trim()}</button>
             ))}
           </div>
         )}
@@ -216,6 +229,7 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
           <input type="file" accept="image/*" hidden disabled={!hasKey} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
         <textarea
+          ref={inputRef}
           aria-label="메시지"
           rows={1}
           value={input}

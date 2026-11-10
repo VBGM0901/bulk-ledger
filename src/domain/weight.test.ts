@@ -52,3 +52,9 @@ test('forecast: date when the goal is reached at the current pace, null when not
   const flat3 = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-25', i), kg: 70 }));
   expect(forecastDate(flat3, g, '2026-11-14')).toBeNull();
 });
+
+test('forecast says "reached" (today) once at the goal even if weight levelled off', () => {
+  const g = { startKg: 70, targetKg: 70, startDate: '2026-10-25', endDate: '2027-01-25' };
+  const flat3 = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-25', i), kg: 70 }));
+  expect(forecastDate(flat3, g, '2026-11-14')).toBe('2026-11-14');
+});

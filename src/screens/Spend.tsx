@@ -101,7 +101,7 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
           </div>
         }
       >
-        <div className="cal" role="grid" aria-label={`${y}년 ${m}월 지출 달력`}>
+        <div className="cal" role="group" aria-label={`${y}년 ${m}월 지출 달력`}>
           {['일', '월', '화', '수', '목', '금', '토'].map((w, i) => <div key={w} className={`cal-head ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}`}>{w}</div>)}
           {Array.from({ length: dow(month) }, (_, i) => <div key={`e${i}`} />)}
           {days.map((d) => {

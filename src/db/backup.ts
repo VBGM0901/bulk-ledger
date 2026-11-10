@@ -1,4 +1,4 @@
-import { DEFAULT_FOODS, DEFAULT_MEALS, DEFAULT_SETTINGS, MILK } from '../domain/defaults';
+import { DEFAULT_FOODS, DEFAULT_SETTINGS, MILK } from '../domain/defaults';
 import { TABLES, type AppDB, type TableName } from './db';
 import type { Settings } from '../domain/types';
 
@@ -10,20 +10,38 @@ export interface BackupFile {
   data: Partial<Record<TableName, unknown[]>>;
 }
 
-/** 예전 기본 식단에서 바뀐 부분을 한 번만 고친다. 사용자가 직접 바꾼 식단·목표는 건드리지 않는다. */
-const AFTERNOON_V1 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }]);
-const AFTERNOON_V2 = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }]);
+/** 예전 기본 식단에서 바뀐 부분을 버전마다 한 번만 고친다. 사용자가 직접 바꾼 식단·목표는 건드리지 않는다. */
+const items = (xs: [string, number][]) => xs.map(([foodId, qty]) => ({ foodId, qty }));
+const AFTERNOON_JUICE = JSON.stringify(items([['bread', 1], ['pb', 16], ['banana', 1], ['juice', 1]]));
+const AFTERNOON_PLAIN = items([['bread', 1], ['pb', 16], ['banana', 1]]);
+const AFTERNOON_MILK = items([['bread', 1], ['pb', 16], ['banana', 1], ['milk', 200]]);
+const DINNER_NUTS = JSON.stringify(items([['nuts', 30]]));
+export const SETTINGS_VERSION = 2;
+
 export function migrateSettings(s: Settings): Settings {
-  if ((s.migratedV ?? 0) >= 1) return s; // 이미 적용함 — 사용자가 다시 바꾼 값은 그대로 둔다
-  const afternoon = DEFAULT_MEALS.find((m) => m.name === '오후 간식')!.items;
-  const meals = s.meals.map((m) => {
-    const cur = JSON.stringify(m.items);
-    // 과일주스는 오후에 못 먹음 → 우유 200ml (2026-11-10)
-    return m.name === '오후 간식' && (cur === AFTERNOON_V1 || cur === AFTERNOON_V2) ? { ...m, items: afternoon } : m;
-  });
-  const p = s.proteinTarget;
-  const proteinTarget: [number, number] = p[0] === 110 && p[1] === 120 ? [90, 110] : p;
-  return { ...s, meals, proteinTarget, migratedV: 1 };
+  let v = s.migratedV ?? 0;
+  let { meals, proteinTarget } = s;
+  if (v < 1) {
+    // v1 (2026-11-10): 오후 과일주스 → 우유 200ml, 단백질 목표 110~120 → 90~110
+    meals = meals.map((m) => {
+      const cur = JSON.stringify(m.items);
+      return m.name === '오후 간식' && (cur === AFTERNOON_JUICE || cur === JSON.stringify(AFTERNOON_PLAIN)) ? { ...m, items: AFTERNOON_MILK } : m;
+    });
+    if (proteinTarget[0] === 110 && proteinTarget[1] === 120) proteinTarget = [90, 110];
+    v = 1;
+  }
+  if (v < 2) {
+    // v2 (2026-11-10): 우유는 오후 간식이 아니라 저녁에
+    const afternoon = meals.find((m) => m.name === '오후 간식');
+    const dinner = meals.find((m) => m.name === '저녁');
+    if (afternoon && dinner && JSON.stringify(afternoon.items) === JSON.stringify(AFTERNOON_MILK) && JSON.stringify(dinner.items) === DINNER_NUTS) {
+      meals = meals.map((m) =>
+        m.name === '오후 간식' ? { ...m, items: AFTERNOON_PLAIN } : m.name === '저녁' ? { ...m, items: items([['nuts', 30], ['milk', 200]]) } : m,
+      );
+    }
+    v = 2;
+  }
+  return v === s.migratedV ? s : { ...s, meals, proteinTarget, migratedV: v };
 }
 
 export async function ensureDefaults(db: AppDB): Promise<void> {

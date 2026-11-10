@@ -33,8 +33,8 @@ export function forecastDate(logs: WeightLog[], goal: WeightGoal | null, today: 
   if (!goal) return null;
   const rate = twoWeekRate(logs, today) ?? weeklyRate(logs, today);
   const now = movingAverage(logs, today);
+  if (now !== null && now >= goal.targetKg) return today;
   if (rate === null || now === null || rate < 0.05) return null;
-  if (now >= goal.targetKg) return today;
   const days = Math.ceil(((goal.targetKg - now) / rate) * 7);
   return days > 730 ? null : addDays(today, days);
 }

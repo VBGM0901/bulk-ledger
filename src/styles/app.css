@@ -158,12 +158,12 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .week-stamp h2{font-size:16px}
 .stamps{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px}
 .stamp{display:grid;justify-items:center;gap:3px}
-.stamp i{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:2px dashed var(--molu-line);font-style:normal;font-size:12px;font-weight:800;color:var(--molu-muted)}
+.stamp i{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:2px dashed var(--molu-line);font-style:normal;font-size:11px;font-weight:800;letter-spacing:-.04em;color:var(--molu-muted)}
 .stamp small{font-size:11px;font-weight:700;color:var(--molu-muted)}
 .stamp.today small{color:var(--molu-accent)}
 .stamp.today i{border-color:var(--molu-accent)}
 .stamp.future i{opacity:.4}
-.stamp.g-good i{border:0;background:var(--molu-ok);color:#fff;font-size:16px}
+.stamp.g-good i{border:0;background:var(--molu-ok);color:#fff}
 .stamp.g-ok i{border:2px solid var(--molu-warning);color:var(--molu-warning)}
 .stamp.g-low i{border:2px solid var(--molu-error);color:var(--molu-error)}
 :root[data-molu-theme="dark"] .stamp.g-good i{color:#0a1427}
@@ -180,3 +180,7 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .dot.nospend{background:var(--molu-ok)}.dot.big{background:var(--molu-error)}
 .checkin{border-color:var(--btn-line)}
 .checkin h2{font-size:16px}
+.stamp-note{font-size:11px;margin:8px 0 0;line-height:1.5}
+@media(max-width:360px){.stamp i{width:34px;height:34px;font-size:10px}}
+.quick-weight{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0 8px;margin-bottom:6px;border-bottom:1px solid var(--molu-line);flex-wrap:wrap}
+.quick-weight .input.small{width:72px;text-align:center;font-size:17px}

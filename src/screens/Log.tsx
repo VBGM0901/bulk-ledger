@@ -51,7 +51,7 @@ export default function Log({ data }: { data: AppData }) {
           </div>
         }
       >
-        <div className="cal" role="grid" aria-label={`${y}년 ${m}월 기록 달력`}>
+        <div className="cal" role="group" aria-label={`${y}년 ${m}월 기록 달력`}>
           {WEEK.map((w, i) => <div key={w} className={`cal-head ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}`}>{w}</div>)}
           {Array.from({ length: dow(month) }, (_, i) => <div key={`e${i}`} />)}
           {days.map((d) => {
@@ -114,7 +114,11 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
         <div className="row">
           <h2>{label}</h2>
           <span className="row" style={{ gap: 6 }}>
-            <button className="btn" onClick={async () => setCopyMsg((await copyDayMeals(db, addDays(date, -1), date)) ? null : '전날 기록이 없어요.')}>어제처럼</button>
+            <button className="btn" onClick={async () => {
+              if (log && !window.confirm('이 날 체크한 끼니를 어제 기록으로 바꿀까요? (추가 음식은 그대로)')) return;
+              const ok = await copyDayMeals(db, addDays(date, -1), date);
+              setCopyMsg(ok ? '어제 먹은 대로 체크했어요. 다르게 먹은 것만 고쳐 주세요.' : '전날 기록이 없어요.');
+            }}>어제처럼</button>
             <button className="btn primary" onClick={() => markAllEaten(db, date, names)}>전부 다 먹음</button>
           </span>
         </div>
@@ -124,7 +128,7 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
             <b className={`num ${intake ? (intake.grade === 'good' ? 'ok' : 'warn') : ''}`}>
               {intake ? formatNum(intake.kcal) : '0'}
             </b>
-            <small className="muted"> / {formatNum(data.settings.kcalTarget)}</small>
+            <small className="muted"> / {formatNum(intake?.target ?? data.settings.kcalTarget)}</small>
           </div>
           <div>
             <span className="muted">단백질</span>

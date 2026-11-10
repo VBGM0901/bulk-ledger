@@ -159,8 +159,8 @@ export default function Settings({ data }: { data: AppData }) {
             onBlur={(e) => { const v = Number(e.target.value); if (v > 20) updateSettings(db, { weightGoal: { ...goal, targetKg: v } }); }} /></Field>
         </div>
         <div className="row">
-          <Field label="시작일"><input type="date" value={goal.startDate} onChange={(e) => updateSettings(db, { weightGoal: { ...goal, startDate: e.target.value } })} /></Field>
-          <Field label="목표일"><input type="date" value={goal.endDate} onChange={(e) => updateSettings(db, { weightGoal: { ...goal, endDate: e.target.value } })} /></Field>
+          <Field label="시작일"><input type="date" value={goal.startDate} onChange={(e) => { const v = e.target.value; if (v && v < goal.endDate) updateSettings(db, { weightGoal: { ...goal, startDate: v } }); }} /></Field>
+          <Field label="목표일"><input type="date" value={goal.endDate} onChange={(e) => { const v = e.target.value; if (v && v > goal.startDate) updateSettings(db, { weightGoal: { ...goal, endDate: v } }); }} /></Field>
         </div>
       </Card>
 

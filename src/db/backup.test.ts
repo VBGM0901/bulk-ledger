@@ -81,3 +81,18 @@ test('migration runs only once: a protein target the user sets back to 110~120 s
   await ensureDefaults(db);
   expect((await db.settings.get('settings'))!.proteinTarget).toEqual([110, 120]);
 });
+
+test('v1 plan (milk in the afternoon, nuts-only dinner) moves milk to dinner once', () => {
+  const v1 = {
+    ...DEFAULT_SETTINGS, migratedV: 1,
+    meals: DEFAULT_SETTINGS.meals.map((m) =>
+      m.name === '오후 간식' ? { ...m, items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'milk', qty: 200 }] }
+        : m.name === '저녁' ? { ...m, items: [{ foodId: 'nuts', qty: 30 }] } : m),
+  };
+  const out = migrateSettings(v1);
+  expect(out.migratedV).toBe(2);
+  expect(out.meals.find((m) => m.name === '오후 간식')!.items.some((i) => i.foodId === 'milk')).toBe(false);
+  expect(out.meals.find((m) => m.name === '저녁')!.items).toEqual([{ foodId: 'nuts', qty: 30 }, { foodId: 'milk', qty: 200 }]);
+  // 이미 v2면 다시 안 건드림
+  expect(migrateSettings({ ...v1, migratedV: 2 })).toEqual({ ...v1, migratedV: 2 });
+});

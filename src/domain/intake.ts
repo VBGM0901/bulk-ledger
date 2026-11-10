@@ -1,4 +1,4 @@
-import { addDays } from './dates';
+import { addDays, todayISO } from './dates';
 import { dailyNutrition } from './nutrition';
 import type { DinnerChoice, DinnerLog, FoodItem, IntakeLog, ISODate, Meal, MealStatus, Settings } from './types';
 
@@ -15,7 +15,9 @@ export interface DayIntake {
   /** 체크한 끼니 기준으로 실제 먹은 양. 체크 안 한 끼니는 0으로 본다. */
   kcal: number;
   protein: number;
-  /** kcal / 목표 kcal */
+  /** 그날 적용되던 칼로리 목표 (주간 체크인으로 바뀐 경우 그 전 날은 예전 목표) */
+  target: number;
+  /** kcal / 그날 목표 kcal */
   pct: number;
   checked: number;
   total: number;
@@ -30,7 +32,7 @@ export function gradeOf(pct: number): IntakeGrade {
 export function dayIntake(
   date: ISODate,
   foods: FoodItem[],
-  settings: Pick<Settings, 'meals' | 'dinner' | 'kcalTarget'>,
+  settings: Pick<Settings, 'meals' | 'dinner' | 'kcalTarget'> & Partial<Pick<Settings, 'checkins'>>,
   dinners: DinnerLog[],
   intakes: IntakeLog[],
 ): DayIntake | null {
@@ -70,9 +72,10 @@ export function dayIntake(
     kcal += e.kcal;
     protein += e.protein;
   }
-  const pct = settings.kcalTarget > 0 ? kcal / settings.kcalTarget : 0;
+  const target = targetOn(date, settings);
+  const pct = target > 0 ? kcal / target : 0;
   return {
-    date, planKcal: n.kcal, planProtein: n.protein,
+    date, planKcal: n.kcal, planProtein: n.protein, target,
     kcal: Math.round(kcal), protein: Math.round(protein * 10) / 10,
     pct, checked, total: n.byMeal.length, grade: gradeOf(pct),
   };
@@ -81,7 +84,7 @@ export function dayIntake(
 /** 어제까지 최근 n일 중 기록한 날들의 평균 달성률 (오늘은 아직 덜 먹었을 수 있어 뺀다). 기록한 날이 없으면 null. */
 export function recentIntakePct(
   today: ISODate, days: number,
-  foods: FoodItem[], settings: Pick<Settings, 'meals' | 'dinner' | 'kcalTarget'>, dinners: DinnerLog[], intakes: IntakeLog[],
+  foods: FoodItem[], settings: Pick<Settings, 'meals' | 'dinner' | 'kcalTarget'> & Partial<Pick<Settings, 'checkins'>>, dinners: DinnerLog[], intakes: IntakeLog[],
 ): { pct: number; logged: number } | null {
   const xs: number[] = [];
   for (let i = 1; i <= days; i++) {
@@ -98,4 +101,15 @@ export function initialItems(meal: Meal, status: MealStatus | undefined): Record
   for (const it of meal.items) out[it.foodId] = (out[it.foodId] ?? 0) + it.qty * f;
   if (meal.name === '저녁') out[HOME_KEY] = f;
   return out;
+}
+
+/**
+ * 그날 적용되던 칼로리 목표. 주간 체크인으로 목표를 바꾼 날 이전은 예전 목표로 본다
+ * (목표를 올렸다고 지난 날의 달성률이 바뀌면 안 되므로).
+ */
+export function targetOn(date: ISODate, s: Pick<Settings, 'kcalTarget'> & Partial<Pick<Settings, 'checkins'>>): number {
+  const applied = (s.checkins ?? []).filter((c) => c.choice === 'apply' && c.delta !== 0).sort((a, b) => a.at.localeCompare(b.at));
+  let t = s.kcalTarget - applied.reduce((x, c) => x + c.delta, 0);
+  for (const c of applied) if (todayISO(new Date(c.at)) <= date) t += c.delta;
+  return t;
 }
