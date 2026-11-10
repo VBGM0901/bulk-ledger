@@ -26,7 +26,7 @@ describe('Home', () => {
     render(<Home data={deriveAppData(rawFixture({ ...SAMPLE_BUDGET, weights: [{ date: '2026-11-01', kg: 70 }] }), TODAY)} navigate={() => {}} />);
     expect(screen.getByText('1,216,380원')).toBeInTheDocument();
     expect(screen.getByText('40,546원')).toBeInTheDocument();
-    expect(screen.getByText(/2,746 \/ 2,800 kcal/)).toBeInTheDocument();
+    expect(screen.getByText(/2,626 \/ 2,800 kcal/)).toBeInTheDocument();
     expect(screen.getByText(/백업한 지 7일이 넘었어요/)).toBeInTheDocument();
   });
 
@@ -215,7 +215,7 @@ describe('Log (기록 달력)', () => {
   test('a logged day shows its percent on the calendar', () => {
     const d = deriveAppData(rawFixture({ intakes: [{ date: '2026-11-09', meals: Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all'])) }] }), TODAY);
     render(<Log data={d} />);
-    expect(screen.getByRole('button', { name: /^9일 식사 98% 잘 먹음/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^9일 식사 94% 조금 부족/ })).toBeInTheDocument();
   });
 });
 
@@ -231,7 +231,7 @@ describe('Shopping', () => {
 describe('Chat (대화방)', () => {
   test('without API key: asks to set the key, input disabled', () => {
     render(<Chat data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
-    expect(screen.getByText(/API 키가 아직 없어요/)).toBeInTheDocument();
+    expect(screen.getByText(/먼저 Claude API 키를 넣어 주세요/)).toBeInTheDocument();
     expect(screen.getByLabelText('메시지')).toBeDisabled();
   });
 
@@ -275,5 +275,31 @@ describe('Log 추가 음식', () => {
     fireEvent.change(screen.getByLabelText('칼로리(kcal)'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '넣기' }));
     await waitFor(async () => expect((await db.intakes.get(TODAY))?.extras?.[0]).toMatchObject({ name: '삼각김밥', kcal: 200, protein: 0 }));
+  });
+});
+
+describe('Chat 키 입력칸', () => {
+  test('valid key: checks the connection, then saves', async () => {
+    const f = vi.fn().mockResolvedValue(new Response(JSON.stringify({ content: [{ type: 'text', text: '확인' }] }), { status: 200 }));
+    vi.stubGlobal('fetch', f);
+    render(<Chat data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Claude API 키'), { target: { value: ' sk-ant-test-key ' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(async () => expect((await db.settings.get('settings'))?.apiKey).toBe('sk-ant-test-key'));
+    expect(f.mock.calls[0][1].headers['x-api-key']).toBe('sk-ant-test-key');
+  });
+
+  test('rejected key is not saved; wrong format is caught before sending', async () => {
+    const f = vi.fn().mockResolvedValue(new Response('{}', { status: 401 }));
+    vi.stubGlobal('fetch', f);
+    render(<Chat data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Claude API 키'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('sk-ant-');
+    expect(f).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Claude API 키'), { target: { value: 'sk-ant-bad' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(await screen.findByText(/연결이 안 돼요/)).toBeInTheDocument();
+    expect((await db.settings.get('settings'))?.apiKey).toBe('');
   });
 });

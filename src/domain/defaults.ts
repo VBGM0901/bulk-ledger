@@ -66,7 +66,7 @@ export const DEFAULT_MEALS: Meal[] = [
   { name: '아침', items: [{ foodId: 'juice', qty: 1 }, { foodId: 'yogurt', qty: 1 }, { foodId: 'egg', qty: 2 }] },
   { name: '오전 간식', items: [{ foodId: 'bread', qty: 2 }, { foodId: 'pb', qty: 32 }, { foodId: 'banana', qty: 1 }] },
   { name: '점심', items: [{ foodId: 'rice', qty: 1 }, { foodId: 'egg', qty: 2 }] },
-  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }] },
+  { name: '오후 간식', items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }] }, // 과일주스는 오후에 못 먹음 (2026-11-10)
   { name: '저녁', items: [{ foodId: 'nuts', qty: 30 }] },
 ];
 

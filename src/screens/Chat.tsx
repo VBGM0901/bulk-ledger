@@ -3,9 +3,10 @@ import { ArrowUp, Check, ImagePlus, Undo2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../App';
 import { runChatTurn, undoAction } from '../claude/agent';
+import { callClaude, ClaudeError, MODELS } from '../claude/client';
 import type { ApiMessage } from '../claude/client';
 import { prepareImage } from '../claude/image';
-import { newId } from '../db/actions';
+import { newId, updateSettings } from '../db/actions';
 import { db } from '../db/db';
 import type { ChatMessage } from '../domain/types';
 import type { AppData } from '../state/useAppData';
@@ -24,6 +25,61 @@ const time = (iso: string) => {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
+
+/** 키가 없을 때 대화방 맨 위에 뜨는 키 입력칸. 먼저 연결을 확인하고, 되면 저장한다. */
+function KeySetup({ onMore }: { onMore: () => void }) {
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'err' | 'warn'; text: string } | null>(null);
+
+  async function save() {
+    const k = key.trim();
+    if (!k) return;
+    if (!k.startsWith('sk-ant-')) {
+      setMsg({ tone: 'err', text: 'API 키는 sk-ant- 로 시작해요. Console에서 복사한 키 전체를 붙여넣어 주세요.' });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await callClaude({ apiKey: k, model: MODELS.capture, system: '한 단어로 답해.', messages: [{ role: 'user', content: '연결 확인' }], maxTokens: 10 });
+      await updateSettings(db, { apiKey: k });
+      setKey('');
+    } catch (e) {
+      if (e instanceof ClaudeError && e.kind === 'auth') {
+        setMsg({ tone: 'err', text: '이 키로는 연결이 안 돼요. 키를 다시 복사했는지, Console에서 삭제·만료되지 않았는지 확인해 주세요.' });
+      } else {
+        // 인터넷·한도 문제 등은 키 자체의 문제가 아닐 수 있어 저장은 해 둔다
+        await updateSettings(db, { apiKey: k });
+        setKey('');
+        setMsg({ tone: 'warn', text: `키는 저장했지만 연결 확인은 못 했어요: ${(e as Error).message}` });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card key-setup">
+      <h2>먼저 Claude API 키를 넣어 주세요</h2>
+      <p className="muted">Console에서 만든 키(sk-ant-…)를 여기에 붙여넣으면 연결을 확인하고 이 폰에만 저장해요.</p>
+      <form className="row" onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <input
+          className="input"
+          type="password"
+          autoComplete="off"
+          aria-label="Claude API 키"
+          placeholder="sk-ant-..."
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+        />
+        <button className="btn primary" disabled={busy || !key.trim()}>{busy ? '확인 중…' : '저장'}</button>
+      </form>
+      {msg && <p className={msg.tone} role="alert">{msg.text}</p>}
+      <button className="link-btn" onClick={onMore}>설정에서 관리하기 →</button>
+    </section>
+  );
+}
 
 export default function Chat({ data, navigate }: { data: AppData; navigate: (s: Screen) => void }) {
   const msgs = useLiveQuery(() => db.chats.orderBy('at').toArray(), []) ?? [];
@@ -104,11 +160,7 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
         {msgs.length > 0 && <button className="btn" onClick={clear}>새 대화</button>}
       </div>
 
-      {!hasKey && (
-        <button className="card warn" style={{ textAlign: 'left' }} onClick={() => navigate('settings')}>
-          Claude API 키가 아직 없어요. 눌러서 설정에서 키를 넣어 주세요.
-        </button>
-      )}
+      {!hasKey && <KeySetup onMore={() => navigate('settings')} />}
 
       <div className="chat-log" aria-live="polite">
         {msgs.length === 0 && (
@@ -177,7 +229,7 @@ export default function Chat({ data, navigate }: { data: AppData; navigate: (s: 
               send(input);
             }
           }}
-          placeholder={hasKey ? '예: 점심에 볶음밥만 먹었어' : 'API 키를 먼저 넣어 주세요'}
+          placeholder={hasKey ? '예: 점심에 볶음밥만 먹었어' : '위 칸에 API 키를 먼저 넣어 주세요'}
           disabled={!hasKey}
         />
         <button className="btn primary icon" aria-label="보내기" disabled={busy || !hasKey || (!input.trim() && !image)}>

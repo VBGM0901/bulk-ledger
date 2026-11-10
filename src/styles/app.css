@@ -157,3 +157,6 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 .plan-list li:first-child{border-top:0}
 .plan-list small{text-align:right}
 .manage-toggle{justify-content:center;margin-top:6px}
+.key-setup{border-color:var(--btn-line);background:var(--btn-bg)}
+.key-setup h2{font-size:16px;margin:0 0 4px}
+.key-setup p{margin:0 0 8px}

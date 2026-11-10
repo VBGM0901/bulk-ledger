@@ -4,7 +4,7 @@ import { dailyQtyByFood, planFoodPurchases } from './foodPlan';
 const line = (plan: ReturnType<typeof planFoodPurchases>, id: string) => plan.lines.find((l) => l.foodId === id)!;
 
 test('daily quantities from template', () => {
-  expect(dailyQtyByFood(DEFAULT_MEALS)).toEqual({ juice: 2, yogurt: 1, egg: 4, bread: 3, pb: 48, banana: 2, rice: 1, nuts: 30 });
+  expect(dailyQtyByFood(DEFAULT_MEALS)).toEqual({ juice: 1, yogurt: 1, egg: 4, bread: 3, pb: 48, banana: 2, rice: 1, nuts: 30 });
 });
 
 test('30-day plan costs 283,620 with no stock', () => {

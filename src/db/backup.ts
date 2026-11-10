@@ -1,5 +1,6 @@
 import { DEFAULT_FOODS, DEFAULT_SETTINGS } from '../domain/defaults';
 import { TABLES, type AppDB, type TableName } from './db';
+import type { Settings } from '../domain/types';
 
 export class BackupError extends Error {}
 export interface BackupFile {
@@ -9,11 +10,22 @@ export interface BackupFile {
   data: Partial<Record<TableName, unknown[]>>;
 }
 
+/** 예전 기본 식단에서 바뀐 부분을 한 번만 고친다. 사용자가 직접 바꾼 식단은 건드리지 않는다. */
+const OLD_AFTERNOON = JSON.stringify([{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }]);
+export function migrateSettings(s: Settings): Settings {
+  const meals = s.meals.map((m) =>
+    m.name === '오후 간식' && JSON.stringify(m.items) === OLD_AFTERNOON
+      ? { ...m, items: m.items.filter((i) => i.foodId !== 'juice') } // 과일주스는 오후에 못 먹음
+      : m,
+  );
+  return { ...s, meals };
+}
+
 export async function ensureDefaults(db: AppDB): Promise<void> {
   await db.transaction('rw', db.settings, db.foods, async () => {
     const s = await db.settings.get('settings');
     if (!s) await db.settings.put(DEFAULT_SETTINGS);
-    else await db.settings.put({ ...DEFAULT_SETTINGS, ...s }); // 새 설정 항목이 생겨도 기본값으로 채움
+    else await db.settings.put(migrateSettings({ ...DEFAULT_SETTINGS, ...s })); // 새 설정 항목이 생겨도 기본값으로 채움
     if ((await db.foods.count()) === 0) await db.foods.bulkPut(DEFAULT_FOODS);
   });
 }

@@ -52,3 +52,15 @@ test('merge mode keeps existing rows and adds new ones', async () => {
   await importBackup(db, { app: 'bulk-ledger', version: 1, data: { incomes: [{ id: 'b', name: 'B', amount: 2 }] } }, 'merge');
   expect(await db.incomes.count()).toBe(2);
 });
+
+import { migrateSettings } from './backup';
+import { DEFAULT_SETTINGS } from '../domain/defaults';
+test('old afternoon snack with juice is migrated once; a user-edited plan is left alone', () => {
+  const old = { ...DEFAULT_SETTINGS, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
+    ? { ...m, items: [{ foodId: 'bread', qty: 1 }, { foodId: 'pb', qty: 16 }, { foodId: 'banana', qty: 1 }, { foodId: 'juice', qty: 1 }] } : m) };
+  const fixed = migrateSettings(old).meals.find((m) => m.name === '오후 간식')!;
+  expect(fixed.items.some((i) => i.foodId === 'juice')).toBe(false);
+  const custom = { ...DEFAULT_SETTINGS, meals: DEFAULT_SETTINGS.meals.map((m) => m.name === '오후 간식'
+    ? { ...m, items: [{ foodId: 'juice', qty: 2 }] } : m) };
+  expect(migrateSettings(custom).meals.find((m) => m.name === '오후 간식')!.items).toEqual([{ foodId: 'juice', qty: 2 }]);
+});
