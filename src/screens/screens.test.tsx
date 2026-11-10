@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { addDays } from '../domain/dates';
 import { ensureDefaults } from '../db/backup';
 import { db } from '../db/db';
 import { DEFAULT_SETTINGS } from '../domain/defaults';
@@ -301,5 +302,72 @@ describe('검수 후 추가 기능', () => {
     render(<Log data={deriveAppData(rawFixture(), TODAY)} />);
     fireEvent.click(screen.getByRole('button', { name: '어제처럼' }));
     expect(await screen.findByText('전날 기록이 없어요.')).toBeInTheDocument();
+  });
+});
+
+describe('지출 달력', () => {
+  const ex = (id: string, date: string, amount: number, memo: string) => ({ id, date, amount, category: '추가식품' as const, memo, source: 'manual' as const });
+  const d = () => deriveAppData(rawFixture({ ...SAMPLE_BUDGET, expenses: [ex('a', '2026-11-10', 1500, '삼각김밥'), ex('b', '2026-11-03', 2000, '음료'), ex('c', '2026-10-20', 3000, '지난달 간식')] }), TODAY);
+
+  test('tapping a day shows only that day; tapping again shows the whole month', () => {
+    render(<Spend data={d()} navigate={() => {}} />);
+    expect(screen.getByText('삼각김밥')).toBeInTheDocument();
+    expect(screen.getByText('음료')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^10일 1500원/ }));
+    expect(screen.queryByText('음료')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '11월 전체' }));
+    expect(screen.getByText('음료')).toBeInTheDocument();
+  });
+
+  test('previous month can be opened to find and delete old entries', () => {
+    render(<Spend data={d()} navigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: '이전 달' }));
+    expect(screen.getByText('2026년 10월 지출')).toBeInTheDocument();
+    expect(screen.getByText('지난달 간식')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /2026-10-20 추가식품 3000원 삭제/ })).toBeInTheDocument();
+  });
+
+  test('past days with no extra spending get a no-spend stamp', () => {
+    render(<Spend data={d()} navigate={() => {}} />);
+    expect(screen.getByRole('button', { name: /^4일 무지출/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^11일$/ })).toBeDisabled(); // 미래
+  });
+});
+
+describe('주간 체크인', () => {
+  const goal = { startKg: 70, targetKg: 76, startDate: '2026-10-20', endDate: '2027-01-20' };
+  const flat = Array.from({ length: 21 }, (_, i) => ({ date: addDays('2026-10-20', i), kg: 70 }));
+  const all = Object.fromEntries(DEFAULT_SETTINGS.meals.map((m) => [m.name, 'all' as const]));
+  const intakes = Array.from({ length: 7 }, (_, i) => ({ date: addDays(TODAY, -(i + 1)), meals: all }));
+
+  test('no records in the last 7 days → no card', () => {
+    render(<Home data={deriveAppData(rawFixture(), TODAY)} navigate={() => {}} />);
+    expect(screen.queryByRole('region', { name: '주간 체크인' })).toBeNull();
+  });
+
+  test('2 weeks flat while eating everything → +250 button raises the target once', async () => {
+    await db.settings.update('settings', { weightGoal: goal });
+    const d = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, weightGoal: goal }, weights: flat, intakes }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    const card = screen.getByRole('region', { name: '주간 체크인' });
+    expect(within(card).getByText('7/7')).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole('button', { name: '목표 +250kcal' }));
+    await waitFor(async () => expect((await db.settings.get('settings'))!.kcalTarget).toBe(3050));
+    expect((await db.settings.get('settings'))!.checkins?.[0]).toMatchObject({ week: '2026-11-09', choice: 'apply', delta: 250 });
+  });
+
+  test('"유지" keeps the target and records the week', async () => {
+    const d = deriveAppData(rawFixture({ settings: { ...DEFAULT_SETTINGS, weightGoal: goal }, weights: flat, intakes }), TODAY);
+    render(<Home data={d} navigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: '이번 주는 유지' }));
+    await waitFor(async () => expect((await db.settings.get('settings'))!.checkins?.[0]?.choice).toBe('keep'));
+    expect((await db.settings.get('settings'))!.kcalTarget).toBe(2800);
+  });
+
+  test('after this week is done the card is gone (or shows the new target if applied)', () => {
+    const settings = { ...DEFAULT_SETTINGS, kcalTarget: 3050, weightGoal: goal, checkins: [{ week: '2026-11-09', choice: 'apply' as const, delta: 250, kcalAfter: 3050, at: '' }] };
+    render(<Home data={deriveAppData(rawFixture({ settings, weights: flat, intakes }), TODAY)} navigate={() => {}} />);
+    expect(screen.queryByRole('region', { name: '주간 체크인' })).toBeNull();
+    expect(screen.getByText(/이번 주 목표: 3,050kcal/)).toBeInTheDocument();
   });
 });

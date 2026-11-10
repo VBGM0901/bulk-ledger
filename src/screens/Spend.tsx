@@ -1,10 +1,12 @@
-import { MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import type { Screen } from '../App';
 import { Card, Field, Stat } from '../components/ui';
 import { deleteExpense, recordExpense, recordPurchase } from '../db/actions';
 import { db } from '../db/db';
+import { dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
 import { shortName } from '../domain/display';
+import { compactKRW, spendByDay } from '../domain/spending';
 import { formatKRW, parseAmount } from '../domain/money';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, type PurchaseLine } from '../domain/types';
 import type { AppData } from '../state/useAppData';
@@ -23,11 +25,27 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
   const [msg, setMsg] = useState<{ tone: 'err' | 'ok'; text: string } | null>(null);
   const [query, setQuery] = useState('');
 
+  // 달력: null = 이번 달 따라감. 날짜를 누르면 그날만 목록에
+  const [monthPick, setMonthPick] = useState<string | null>(null);
+  const [dayPick, setDayPick] = useState<string | null>(null);
+  const month = monthPick ?? monthStart(data.today);
+  const days = monthDays(month);
+  const spend = spendByDay(data.expenses, days, data.today, data.summary.dailyAllowance);
+  const isCurrentMonth = month === monthStart(data.today);
+  const moveMonth = (n: number) => {
+    const m = shiftMonth(month, n);
+    setMonthPick(m === monthStart(data.today) ? null : m);
+    setDayPick(null);
+  };
+  const noSpendDays = days.filter((d) => spend[d].noSpend).length;
+  const monthTotal = days.reduce((t, d) => t + spend[d].total, 0);
+
   const all = data.expenses
-    .filter((e) => e.date >= data.period.start && e.date <= data.period.end)
+    .filter((e) => (dayPick ? e.date === dayPick : e.date.startsWith(month.slice(0, 7))))
     .sort((a, b) => b.date.localeCompare(a.date));
   const shown = all.filter((e) => !query || `${e.memo} ${e.category} ${e.amount}`.includes(query));
   const s = data.summary;
+  const [y, m] = [Number(month.slice(0, 4)), Number(month.slice(5, 7))];
 
   async function addManual() {
     try {
@@ -67,9 +85,54 @@ export default function Spend({ data, navigate }: { data: AppData; navigate: (s:
         </span>
       </button>
 
-      <Card title={`이번 달 지출 (${data.period.start.slice(5)} ~ ${data.period.end.slice(5)})`}>
+      <Card title={`예산월 (${data.period.start.slice(5)} ~ ${data.period.end.slice(5)})`}>
         <Stat label="식단 구매" value={formatKRW(s.foodSpent)} sub={`계획 ${formatKRW(s.foodPlan)}`} />
-        <Stat label="그 외 지출" value={formatKRW(s.otherSpent)} />
+        <Stat label="그 외 지출" value={formatKRW(s.otherSpent)} sub={`하루 쓸 수 있는 돈 ${formatKRW(s.dailyAllowance)}`} />
+      </Card>
+
+      <Card
+        title={`${y}년 ${m}월 지출`}
+        action={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn icon" aria-label="이전 달" onClick={() => moveMonth(-1)}><ChevronLeft size={18} aria-hidden /></button>
+            <button className="btn icon" aria-label="다음 달" disabled={isCurrentMonth} onClick={() => moveMonth(1)}><ChevronRight size={18} aria-hidden /></button>
+          </div>
+        }
+      >
+        <div className="cal" role="grid" aria-label={`${y}년 ${m}월 지출 달력`}>
+          {['일', '월', '화', '수', '목', '금', '토'].map((w, i) => <div key={w} className={`cal-head ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}`}>{w}</div>)}
+          {Array.from({ length: dow(month) }, (_, i) => <div key={`e${i}`} />)}
+          {days.map((d) => {
+            const sp = spend[d];
+            const future = d > data.today;
+            return (
+              <button
+                key={d}
+                className={`cal-day spend ${sp.big ? 'big' : ''} ${sp.noSpend ? 'nospend' : ''} ${d === dayPick ? 'sel' : ''} ${d === data.today ? 'today' : ''}`}
+                disabled={future}
+                aria-pressed={d === dayPick}
+                aria-label={`${Number(d.slice(8))}일${sp.total ? ` ${sp.total}원` : ''}${sp.big ? ' 큰 지출' : ''}${sp.noSpend ? ' 무지출' : ''}`}
+                onClick={() => setDayPick(d === dayPick ? null : d)}
+              >
+                <span className="cal-num">{Number(d.slice(8))}</span>
+                <span className="cal-pct">{sp.other ? compactKRW(sp.other) : sp.noSpend ? '✓' : ''}</span>
+                <span className="cal-kg">{sp.food ? `🛒${compactKRW(sp.food)}` : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="cal-legend muted">
+          <span><i className="dot nospend" />무지출(장보기 빼고)</span>
+          <span><i className="dot big" />큰 지출</span>
+          <span>🛒 식단 장보기</span>
+        </div>
+        <Stat label="이 달 쓴 돈" value={formatKRW(monthTotal)} sub={`무지출 ${noSpendDays}일`} />
+      </Card>
+
+      <Card
+        title={dayPick ? `${Number(dayPick.slice(5, 7))}월 ${Number(dayPick.slice(8))}일 지출` : `${m}월 지출 목록`}
+        action={dayPick ? <button className="btn" onClick={() => setDayPick(null)}>{m}월 전체</button> : undefined}
+      >
         {all.length > 8 && (
           <Field label="검색"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="메모·카테고리·금액" /></Field>
         )}

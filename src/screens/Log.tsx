@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Bar, Card, Stat } from '../components/ui';
 import { copyDayMeals, deleteWeight, logWeight, markAllEaten } from '../db/actions';
 import { db } from '../db/db';
-import { addDays } from '../domain/dates';
+import { addDays, dow, monthDays, monthStart, shiftMonth } from '../domain/dates';
 import { dayIntake, type DayIntake } from '../domain/intake';
 import { formatNum } from '../domain/money';
 import { dailyNutrition } from '../domain/nutrition';
@@ -14,21 +14,6 @@ import { WeightTrend } from './Weight';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const GRADE_LABEL = { good: '잘 먹음', ok: '조금 부족', low: '많이 부족' } as const;
-
-const dow = (d: ISODate) => new Date(`${d}T00:00:00`).getDay();
-const monthStart = (d: ISODate) => `${d.slice(0, 7)}-01`;
-function shiftMonth(first: ISODate, n: number): ISODate {
-  const y = Number(first.slice(0, 4));
-  const m = Number(first.slice(5, 7)) - 1 + n;
-  const yy = y + Math.floor(m / 12);
-  const mm = ((m % 12) + 12) % 12;
-  return `${yy}-${String(mm + 1).padStart(2, '0')}-01`;
-}
-function monthDays(first: ISODate): ISODate[] {
-  const out: ISODate[] = [];
-  for (let d = first; d.slice(0, 7) === first.slice(0, 7); d = addDays(d, 1)) out.push(d);
-  return out;
-}
 
 export default function Log({ data }: { data: AppData }) {
   // null = '오늘'을 따라감 (앱을 켜 둔 채 날이 바뀌어도 새 오늘로)

@@ -171,3 +171,12 @@ input[type=file]::file-selector-button{height:42px;margin:0 12px 0 0;border:0;bo
 /* 대화 빠른 문장 */
 .quick-chips{flex-basis:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .quick-chips button{flex:none;min-height:32px;padding:4px 12px;border-radius:99px;border:1px solid var(--btn-line);background:var(--btn-bg);color:var(--btn-ink);font-size:13px;font-weight:700}
+/* 지출 달력 */
+.cal-day.spend.nospend{background:color-mix(in srgb,var(--molu-ok) 12%,var(--molu-bg))}
+.cal-day.spend.nospend .cal-pct{color:var(--molu-ok);font-size:13px}
+.cal-day.spend.big{background:color-mix(in srgb,var(--molu-error) 12%,var(--molu-bg));border-color:color-mix(in srgb,var(--molu-error) 50%,var(--molu-line))}
+.cal-day.spend.big .cal-pct{color:var(--molu-error)}
+.cal-day.spend .cal-pct{color:var(--molu-ink)}
+.dot.nospend{background:var(--molu-ok)}.dot.big{background:var(--molu-error)}
+.checkin{border-color:var(--btn-line)}
+.checkin h2{font-size:16px}

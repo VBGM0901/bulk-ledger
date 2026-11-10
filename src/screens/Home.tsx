@@ -4,7 +4,10 @@ import { depletionDate } from '../domain/consumption';
 import { addDays } from '../domain/dates';
 import { formatKRW, formatNum } from '../domain/money';
 import { shortName } from '../domain/display';
+import { weeklyReview } from '../domain/checkin';
 import { dayIntake } from '../domain/intake';
+import { weeklyCheckin } from '../db/actions';
+import { db } from '../db/db';
 import { forecastDate, goalWeightOn, movingAverage } from '../domain/weight';
 import type { AppData } from '../state/useAppData';
 
@@ -46,6 +49,8 @@ export default function Home({ data, navigate }: { data: AppData; navigate: (s: 
           백업한 지 7일이 넘었어요. 눌러서 백업하기
         </button>
       )}
+
+      <WeeklyCheckin data={data} navigate={navigate} />
 
       <Card title="오늘 먹은 것" action={<button className="btn primary" onClick={() => navigate('log')}>체크하기</button>}>
         {(() => {
@@ -130,5 +135,50 @@ function WeekStamp({ data, onOpen }: { data: AppData; onOpen: () => void }) {
         ))}
       </div>
     </button>
+  );
+}
+
+/** 주간 체크인: 지난 7일 요약 + 제안을 버튼 한 번으로 (MacroFactor식). 이번 주에 한 번만. */
+function WeeklyCheckin({ data, navigate }: { data: AppData; navigate: (s: Screen) => void }) {
+  const r = weeklyReview(data.today, data.settings, data.foods, data.dinners, data.intakes, data.weights, data.advice);
+  if (!r) return null;
+  const mine = (data.settings.checkins ?? []).find((c) => c.week === r.week);
+  if (r.done) {
+    if (!mine || mine.choice !== 'apply') return null;
+    return (
+      <button className="card hint-card" onClick={() => navigate('diet')}>
+        <span>
+          <b>이번 주 목표: {formatNum(mine.kcalAfter)}kcal ({mine.delta > 0 ? '+' : ''}{mine.delta})</b>
+          <small className="muted">식단 탭 → 식단 편집에서 음식을 {mine.delta > 0 ? '추가' : '줄여'}하세요. 뭘 바꿀지 Claude에게 물어봐도 돼요.</small>
+        </span>
+      </button>
+    );
+  }
+  const advice = data.advice;
+  return (
+    <section className="card checkin" aria-label="주간 체크인">
+      <div className="row"><h2>주간 체크인</h2><span className="muted">지난 7일</span></div>
+      <div className="day-sum">
+        <div><span className="muted">잘 먹은 날</span><b className="num">{r.goodDays}/7</b></div>
+        <div><span className="muted">평균 달성</span><b className="num">{r.avgPct === null ? '–' : `${Math.round(r.avgPct * 100)}%`}</b></div>
+        <div><span className="muted">체중 1주</span><b className="num">{advice.rate === null ? '–' : `${advice.rate >= 0 ? '+' : ''}${formatNum(advice.rate, 1)}`}</b><small className="muted">{advice.rate === null ? '' : 'kg'}</small></div>
+      </div>
+      <p className="advice"><strong>{advice.title}</strong></p>
+      <p className="muted" style={{ marginTop: 0 }}>{advice.detail}</p>
+      {r.weighIns < 3 && <p className="muted small-note">체중을 주 3번 이상 재면 판단이 정확해져요.</p>}
+      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+        {r.delta !== 0 ? (
+          <>
+            <button className="btn" onClick={() => weeklyCheckin(db, r.week, 'keep', 0)}>이번 주는 유지</button>
+            <button className="btn primary" onClick={() => weeklyCheckin(db, r.week, 'apply', r.delta)}>
+              목표 {r.delta > 0 ? '+' : ''}{r.delta}kcal
+            </button>
+          </>
+        ) : (
+          <button className="btn primary" onClick={() => weeklyCheckin(db, r.week, 'ok', 0)}>확인했어요</button>
+        )}
+      </div>
+      <p className="muted small-note">참고용 계산이에요. 한 번에 250kcal 넘게 바꾸지 않아요.</p>
+    </section>
   );
 }

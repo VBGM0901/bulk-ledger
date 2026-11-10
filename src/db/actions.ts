@@ -149,6 +149,22 @@ export async function logWeight(db: AppDB, date: ISODate, kg: number): Promise<v
   await db.weights.put({ date, kg: Math.round(kg * 10) / 10 });
 }
 
+/** 주간 체크인: 고른 대로 칼로리 목표를 바꾸고 기록한다. 한 주에 한 번, 한 번에 최대 ±250kcal. */
+export async function weeklyCheckin(db: AppDB, week: ISODate, choice: 'apply' | 'keep' | 'ok', delta: number): Promise<number> {
+  const d = choice === 'apply' ? Math.max(-250, Math.min(250, delta)) : 0;
+  let after = 0;
+  await db.transaction('rw', db.settings, async () => {
+    const s = (await db.settings.get('settings'))!;
+    if ((s.checkins ?? []).some((c) => c.week === week)) {
+      after = s.kcalTarget;
+      return;
+    }
+    after = Math.max(1500, s.kcalTarget + d);
+    await db.settings.put({ ...s, kcalTarget: after, checkins: [...(s.checkins ?? []), { week, choice, delta: d, kcalAfter: after, at: new Date().toISOString() }] });
+  });
+  return after;
+}
+
 export async function updateSettings(db: AppDB, patch: Partial<Settings>): Promise<void> {
   await db.settings.update('settings', patch);
 }
