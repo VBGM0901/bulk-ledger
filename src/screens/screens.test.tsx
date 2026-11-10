@@ -49,11 +49,13 @@ describe('Diet', () => {
 
   test('peanut butter shows measured vs plan', () => {
     render(<Diet data={data()} />);
+    fireEvent.click(screen.getByRole('button', { name: /식품 관리/ }));
     expect(screen.getByText(/실측 14.3g\/일 · 계획의 30%/)).toBeInTheDocument();
   });
 
   test('finished button records a finish event and zeroes stock', async () => {
     render(<Diet data={data()} />);
+    fireEvent.click(screen.getByRole('button', { name: /식품 관리/ }));
     fireEvent.click(screen.getByRole('button', { name: '매일바이오 그릭요거트 무가당 플레인 150g 다 먹었음' }));
     fireEvent.change(screen.getByLabelText('먹기 시작한 날'), { target: { value: '2026-10-29' } });
     fireEvent.change(screen.getByLabelText('먹은 양 (개)'), { target: { value: '12' } });
@@ -64,6 +66,7 @@ describe('Diet', () => {
 
   test('editing a pack price saves price and history', async () => {
     render(<Diet data={data()} />);
+    fireEvent.click(screen.getByRole('button', { name: /식품 관리/ }));
     fireEvent.click(screen.getByRole('button', { name: '스텔라나 베트남산 바나나 편집' }));
     fireEvent.change(screen.getByLabelText('포장 1 가격'), { target: { value: '3,290' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
@@ -199,10 +202,12 @@ describe('Log (기록 달력)', () => {
     expect(screen.getByText(/목표선 70.1kg/)).toBeInTheDocument();
   });
 
-  test('meal check buttons and "전부 다 먹음" write the intake log', async () => {
+  test('tapping foods checks only those; 전부 and 전부 다 먹음 work', async () => {
     render(<Log data={data} />);
-    fireEvent.click(within(screen.getByRole('group', { name: '아침 먹은 양' })).getByRole('button', { name: '반쯤' }));
-    await waitFor(async () => expect((await db.intakes.get(TODAY))?.meals['아침']).toBe('half'));
+    fireEvent.click(screen.getByRole('button', { name: '아침 그릭요거트 1개' }));
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.items?.['아침']).toEqual({ juice: 0, yogurt: 1, egg: 0 }));
+    fireEvent.click(within(screen.getByRole('region', { name: '점심' })).getByRole('button', { name: '전부' }));
+    await waitFor(async () => expect((await db.intakes.get(TODAY))?.meals['점심']).toBe('all'));
     fireEvent.click(screen.getByRole('button', { name: '전부 다 먹음' }));
     await waitFor(async () => expect(Object.values((await db.intakes.get(TODAY))?.meals ?? {})).toEqual(DEFAULT_SETTINGS.meals.map(() => 'all')));
   });
@@ -256,20 +261,19 @@ describe('Chat (대화방)', () => {
   });
 });
 
-describe('Log 음식별 체크', () => {
-  test('opening a meal and lowering one food stores per-food amounts', async () => {
-    const data = deriveAppData(rawFixture(), TODAY);
-    render(<Log data={data} />);
-    fireEvent.click(screen.getAllByRole('button', { name: /음식별로 체크/ })[0]); // 아침
-    fireEvent.click(screen.getAllByRole('button', { name: '곰곰 맥반석 구운란 줄이기' })[0]);
-    await waitFor(async () => expect((await db.intakes.get(TODAY))?.items?.['아침']).toEqual({ juice: 1, yogurt: 1, egg: 1.5 }));
+describe('Log 추가 음식', () => {
+  test('only yogurt checked → yogurt kcal counted', () => {
+    const d = deriveAppData(rawFixture({ intakes: [{ date: TODAY, meals: {}, items: { 아침: { juice: 0, yogurt: 1, egg: 0 } } }] }), TODAY);
+    render(<Log data={d} />);
+    expect(within(screen.getByRole('region', { name: '아침' })).getByText('135')).toBeInTheDocument();
   });
 
   test('adds a custom extra food', async () => {
     render(<Log data={deriveAppData(rawFixture(), TODAY)} />);
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
     fireEvent.change(screen.getByLabelText('음식 이름'), { target: { value: '삼각김밥' } });
     fireEvent.change(screen.getByLabelText('칼로리(kcal)'), { target: { value: '200' } });
-    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '넣기' }));
     await waitFor(async () => expect((await db.intakes.get(TODAY))?.extras?.[0]).toMatchObject({ name: '삼각김밥', kcal: 200, protein: 0 }));
   });
 });

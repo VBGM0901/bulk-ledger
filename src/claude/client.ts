@@ -62,3 +62,80 @@ export async function callClaude(opts: {
   if (!text) throw new ClaudeError('bad_response');
   return text;
 }
+
+/** 도구 사용 루프용: 응답 본문 전체(content 블록·stop_reason)를 돌려준다. */
+export type ApiBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: string; [k: string]: unknown };
+export interface ApiMessage { role: 'user' | 'assistant'; content: string | ApiBlock[] | ContentBlock[] | Record<string, unknown>[] }
+export interface ApiTool { name: string; description: string; strict?: boolean; input_schema: Record<string, unknown> }
+export interface ApiResponse { content: ApiBlock[]; stop_reason: string | null }
+
+export async function callClaudeRaw(opts: {
+  apiKey: string;
+  model: string;
+  system: string;
+  messages: ApiMessage[];
+  tools?: ApiTool[];
+  maxTokens?: number;
+  effort?: 'low' | 'medium' | 'high';
+  /** 안전 거절 시 서버가 다른 모델로 자동 재시도 (Claude API 베타). 거부되면 끄고 한 번 더 보낸다. */
+  fallbacks?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<ApiResponse> {
+  if (!opts.apiKey) throw new ClaudeError('no_key');
+  if (opts.fallbacks) {
+    try {
+      return await callClaudeRaw({ ...opts, fallbacks: false, withFallbackHeader: true } as Parameters<typeof callClaudeRaw>[0]);
+    } catch (e) {
+      if (e instanceof ClaudeError && e.kind === 'bad_response' && /HTTP 400/.test(e.message)) {
+        return callClaudeRaw({ ...opts, fallbacks: false });
+      }
+      throw e;
+    }
+  }
+  const withFallback = Boolean((opts as { withFallbackHeader?: boolean }).withFallbackHeader);
+  const f = opts.fetchImpl ?? fetch;
+  let res: Response;
+  try {
+    res = await f('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': opts.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        ...(withFallback ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}),
+      },
+      body: JSON.stringify({
+        ...(withFallback ? { fallbacks: 'default' } : {}),
+        model: opts.model,
+        system: opts.system,
+        messages: opts.messages,
+        tools: opts.tools,
+        max_tokens: opts.maxTokens ?? 16000,
+        ...(opts.effort ? { output_config: { effort: opts.effort } } : {}),
+      }),
+    });
+  } catch {
+    throw new ClaudeError('network');
+  }
+  if (res.status === 401 || res.status === 403) throw new ClaudeError('auth');
+  if (res.status === 429 || res.status === 529) throw new ClaudeError('rate');
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j?.error?.message) detail += ` ${String(j.error.message).slice(0, 120)}`;
+    } catch { /* ignore */ }
+    throw new ClaudeError('bad_response', detail);
+  }
+  try {
+    const body = await res.json();
+    if (!Array.isArray(body.content)) throw new Error();
+    return { content: body.content, stop_reason: body.stop_reason ?? null };
+  } catch {
+    throw new ClaudeError('bad_response');
+  }
+}

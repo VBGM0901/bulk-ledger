@@ -50,8 +50,21 @@ export interface WeightLog { date: ISODate; kg: number }
 export interface DinnerLog { date: ISODate; choice: DinnerChoice }
 /** 끼니별로 얼마나 먹었는지. all=다 먹음, half=반쯤, none=못 먹음 */
 export type MealStatus = 'all' | 'half' | 'none';
-/** Claude 대화방 메시지 (폰에만 저장) */
-export interface ChatMessage { id: string; at: string; role: 'user' | 'assistant'; content: string }
+/** 대화방에서 Claude가 기록한 것 하나 + 되돌리기 정보 */
+export type UndoSpec =
+  | { kind: 'expense'; expenseId: string }
+  | { kind: 'intake'; date: ISODate; prev: IntakeLog | null }
+  | { kind: 'weight'; date: ISODate; prev: number | null };
+export interface ChatAction { summary: string; undo: UndoSpec; undone?: boolean }
+/** Claude 대화방 메시지 (폰에만 저장). 사진은 저장하지 않고 hadImage만 남긴다. */
+export interface ChatMessage {
+  id: string;
+  at: string;
+  role: 'user' | 'assistant';
+  content: string;
+  hadImage?: boolean;
+  actions?: ChatAction[];
+}
 /** 계획에 없던 음식 (편의점 간식 등). foodId가 있으면 등록된 식품 × qty. */
 export interface IntakeExtra { id: string; name: string; kcal: number; protein: number; foodId?: string; qty?: number }
 /**

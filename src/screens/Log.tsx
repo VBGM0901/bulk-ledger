@@ -9,7 +9,7 @@ import { formatNum } from '../domain/money';
 import { dailyNutrition } from '../domain/nutrition';
 import type { DinnerChoice, ISODate } from '../domain/types';
 import type { AppData } from '../state/useAppData';
-import { ExtraFoods, MealRow } from './LogParts';
+import { ExtraFoods, MealChecklist } from './LogParts';
 import { WeightTrend } from './Weight';
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -110,70 +110,72 @@ function DayEditor({ data, date, intake, weight }: { data: AppData; date: ISODat
   const names = plan.byMeal.map((m) => m.name);
   const label = `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일 (${WEEK[dow(date)]})${date === data.today ? ' · 오늘' : ''}`;
 
-  return (
-    <Card
-      title={label}
-      action={<button className="btn primary" onClick={() => markAllEaten(db, date, names)}>전부 다 먹음</button>}
-    >
-      <Stat
-        label="먹은 칼로리"
-        value={intake ? `${formatNum(intake.kcal)} / ${formatNum(data.settings.kcalTarget)} kcal` : '체크 전'}
-        sub={intake ? `${Math.round(intake.pct * 100)}% · ${GRADE_LABEL[intake.grade]}` : '끼니마다 먹은 만큼 눌러 주세요'}
-        tone={intake ? (intake.grade === 'good' ? 'ok' : 'warn') : undefined}
-      />
-      {intake && <Bar value={intake.kcal} max={data.settings.kcalTarget} label="그날 칼로리 목표 대비" />}
-      {intake && (
-        <Stat
-          label="먹은 단백질"
-          value={`${formatNum(intake.protein, 1)} g`}
-          sub={`목표 ${data.settings.proteinTarget[0]}~${data.settings.proteinTarget[1]}g`}
-          tone={intake.protein >= data.settings.proteinTarget[0] ? 'ok' : 'warn'}
-        />
-      )}
+  const proteinOk = intake ? intake.protein >= data.settings.proteinTarget[0] : false;
 
-      {data.settings.meals.map((meal) => (
-        <MealRow
-          key={meal.name}
-          data={data}
-          date={date}
-          meal={meal}
-          planKcal={plan.byMeal.find((b) => b.name === meal.name)}
-          log={log}
-          choice={choice}
-        />
+  return (
+    <>
+      <section className="card day-head">
+        <div className="row">
+          <h2>{label}</h2>
+          <button className="btn primary" onClick={() => markAllEaten(db, date, names)}>전부 다 먹음</button>
+        </div>
+        <div className="day-sum">
+          <div>
+            <span className="muted">칼로리</span>
+            <b className={`num ${intake ? (intake.grade === 'good' ? 'ok' : 'warn') : ''}`}>
+              {intake ? formatNum(intake.kcal) : '0'}
+            </b>
+            <small className="muted"> / {formatNum(data.settings.kcalTarget)}</small>
+          </div>
+          <div>
+            <span className="muted">단백질</span>
+            <b className={`num ${intake ? (proteinOk ? 'ok' : 'warn') : ''}`}>{intake ? formatNum(intake.protein, 1) : '0'}g</b>
+            <small className="muted"> / {data.settings.proteinTarget[0]}g</small>
+          </div>
+          <div>
+            <span className="muted">달성</span>
+            <b className="num">{intake ? `${Math.round(intake.pct * 100)}%` : '–'}</b>
+          </div>
+        </div>
+        <Bar value={intake?.kcal ?? 0} max={data.settings.kcalTarget} label="그날 칼로리 목표 대비" />
+        <p className="muted" style={{ margin: 0 }}>먹은 음식을 눌러 체크하세요. 체크한 것만 계산돼요.</p>
+      </section>
+
+      {data.settings.meals.map((meal, i) => (
+        <MealChecklist key={meal.name} data={data} date={date} meal={meal} index={i} log={log} choice={choice} />
       ))}
 
       <ExtraFoods data={data} date={date} log={log} />
 
-      <div className="row" style={{ marginTop: 12 }}>
-        <label className="field" style={{ margin: 0 }}>
-          <span>그날 체중(kg)</span>
-          <input inputMode="decimal" value={kg} onChange={(e) => { setKg(e.target.value); setSaved(false); }} placeholder="kg" />
-        </label>
-        <button
-          className="btn primary"
-          style={{ alignSelf: 'flex-end' }}
-          onClick={async () => {
-            try {
-              await logWeight(db, date, Number(kg));
-              setErr(null);
-              setSaved(true);
-            } catch (e) {
-              setErr((e as Error).message);
-            }
-          }}
-        >
-          체중 저장
-        </button>
-        {weight !== null && (
-          <button className="btn" style={{ alignSelf: 'flex-end' }} aria-label="그날 체중 지우기" onClick={() => { deleteWeight(db, date); setKg(''); }}>
-            지우기
+      <section className="card">
+        <div className="row weight-row">
+          <label className="field" style={{ margin: 0 }}>
+            <span>그날 체중(kg)</span>
+            <input inputMode="decimal" value={kg} onChange={(e) => { setKg(e.target.value); setSaved(false); }} placeholder="kg" />
+          </label>
+          <button
+            className="btn primary"
+            onClick={async () => {
+              try {
+                await logWeight(db, date, Number(kg));
+                setErr(null);
+                setSaved(true);
+              } catch (e) {
+                setErr((e as Error).message);
+              }
+            }}
+          >
+            체중 저장
           </button>
-        )}
-      </div>
-      {err && <p className="err" role="alert">{err}</p>}
-      {saved && !err && <p className="ok" role="status">저장했어요.</p>}
-      <p className="muted">체중은 아침에 화장실 다녀온 뒤 같은 조건으로 재면 추세가 정확해져요.</p>
-    </Card>
+          {weight !== null && (
+            <button className="btn" aria-label="그날 체중 지우기" onClick={() => { deleteWeight(db, date); setKg(''); }}>
+              지우기
+            </button>
+          )}
+        </div>
+        {err && <p className="err" role="alert">{err}</p>}
+        {saved && !err && <p className="ok" role="status">저장했어요.</p>}
+      </section>
+    </>
   );
 }

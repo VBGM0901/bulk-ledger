@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+import { mealColor, shortName } from '../domain/display';
 import { useState } from 'react';
 import { Card, Field, SourceTag, Stat } from '../components/ui';
 import { adjustStock, newId, recordFinish, updateSettings } from '../db/actions';
@@ -162,6 +164,7 @@ export default function Diet({ data }: { data: AppData }) {
   const [finishing, setFinishing] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editMeals, setEditMeals] = useState(false);
+  const [manage, setManage] = useState(false);
   const meals = data.settings.meals;
   const byId = new Map(data.foods.map((f) => [f.id, f]));
 
@@ -176,31 +179,53 @@ export default function Diet({ data }: { data: AppData }) {
 
   return (
     <>
-      <Card
-        title="하루 계획"
-        action={<button className="btn" onClick={() => setEditMeals(!editMeals)}>{editMeals ? '완료' : '식단 편집'}</button>}
-      >
-        <Stat label="칼로리" value={`${formatNum(data.nutrition.kcal)} kcal`} />
-        <Stat label="단백질" value={`${formatNum(data.nutrition.protein, 1)} g`} />
-        <p className="muted">목표 {formatNum(data.settings.kcalTarget)}kcal · 단백질 {data.settings.proteinTarget.join('~')}g. 저녁 집밥은 홈에서 원탭으로 골라요.</p>
-      </Card>
+      <section className="card day-head">
+        <div className="row">
+          <h2>하루 계획</h2>
+          <button className="btn" onClick={() => setEditMeals(!editMeals)}>{editMeals ? '완료' : '식단 편집'}</button>
+        </div>
+        <div className="day-sum">
+          <div><span className="muted">칼로리</span><b className="num">{formatNum(data.nutrition.kcal)}</b><small className="muted"> / {formatNum(data.settings.kcalTarget)}</small></div>
+          <div><span className="muted">단백질</span><b className="num">{formatNum(data.nutrition.protein, 1)}g</b><small className="muted"> / {data.settings.proteinTarget[0]}g</small></div>
+          <div><span className="muted">끼니</span><b className="num">{meals.length}번</b></div>
+        </div>
+        <p className="muted" style={{ margin: '6px 0 0' }}>먹은 것 체크는 <b>기록</b> 탭에서 해요.</p>
+      </section>
 
       {data.nutrition.byMeal.map((bm, mi) => (
-        <Card key={`${bm.name}-${mi}`} title={`${bm.name} · ${formatNum(bm.kcal)}kcal · P ${formatNum(bm.protein, 1)}g`}>
+        <section key={`${bm.name}-${mi}`} className="meal-card" style={{ '--c': mealColor(mi) } as CSSProperties} aria-label={bm.name}>
+          <header>
+            <span className="meal-dot" aria-hidden />
+            <strong>{bm.name}</strong>
+            <span className="meal-kcal num">{formatNum(bm.kcal)} <small>kcal · P {formatNum(bm.protein, 1)}g</small></span>
+          </header>
           {editMeals ? (
             <MealEditor meal={meals[mi]} index={mi} meals={meals} foods={data.foods} />
           ) : (
-            meals[mi].items.map((it, ii) => {
-              const f = byId.get(it.foodId);
-              return <Stat key={ii} label={f?.name ?? '삭제된 식품'} value={`${formatNum(it.qty, it.qty % 1 ? 1 : 0)}${f?.unit ?? ''}`} />;
-            })
+            <ul className="plan-list">
+              {meals[mi].items.map((it, ii) => {
+                const f = byId.get(it.foodId);
+                return (
+                  <li key={ii}>
+                    <span>{shortName(f)}</span>
+                    <b className="num">{formatNum(it.qty, it.qty % 1 ? 1 : 0)}{f?.unit ?? ''}</b>
+                    <small className="muted">{formatNum((f?.perUnit.kcal ?? 0) * it.qty)}kcal</small>
+                  </li>
+                );
+              })}
+              {bm.name === '저녁' && (
+                <li><span>집밥 ({data.dinnerToday === 'meat' ? '고기 있음' : data.dinnerToday === 'none' ? '고기 없음' : '덜 먹음'})</span><b className="num">1인분</b><small className="muted">{data.settings.dinner[data.dinnerToday].kcal}kcal</small></li>
+              )}
+            </ul>
           )}
-          {bm.name === '저녁' && <p className="muted">+ 집밥 {data.settings.dinner[data.dinnerToday].kcal}kcal (추정)</p>}
-        </Card>
+        </section>
       ))}
 
-      <h2 className="screen-title" style={{ margin: '18px 0 8px' }}>식품</h2>
-      {data.foods.map((f) => {
+      <button className="btn block manage-toggle" aria-expanded={manage} onClick={() => setManage(!manage)}>
+        {manage ? '식품 관리 닫기 ▴' : '식품 관리 (가격·재고·다 먹었음) ▾'}
+      </button>
+      {manage && (<>
+            {data.foods.map((f) => {
         const plan = data.dailyPlan[f.id] ?? 0;
         const measured = data.measured[f.id];
         const eff = costEfficiency(f);
@@ -261,6 +286,7 @@ export default function Diet({ data }: { data: AppData }) {
         );
       })}
       <button className="btn block" onClick={addFood}>+ 새 식품 추가</button>
+      </>)}
     </>
   );
 }

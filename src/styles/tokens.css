@@ -18,3 +18,6 @@ body{margin:0;background:var(--molu-bg);color:var(--molu-ink);font-family:Paperl
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:inherit;text-decoration:none}
+/* 끼니 색: 아침·오전 간식·점심·오후 간식·저녁·기타 */
+:root{--meal-0:#d97706;--meal-1:#059669;--meal-2:#2563eb;--meal-3:#7c3aed;--meal-4:#e11d48;--meal-5:#0d9488;--meal-extra:#64748b}
+:root[data-molu-theme="dark"]{--meal-0:#fbbf24;--meal-1:#34d399;--meal-2:#60a5fa;--meal-3:#a78bfa;--meal-4:#fb7185;--meal-5:#2dd4bf;--meal-extra:#94a3b8}
